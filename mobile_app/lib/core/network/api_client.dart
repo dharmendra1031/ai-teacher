@@ -10,9 +10,14 @@ import 'package:http/http.dart' as http;
 typedef JsonMap = Map<String, dynamic>;
 
 class ApiClient extends GetxService {
-  ApiClient({http.Client? client}) : _client = client ?? http.Client();
+  ApiClient({
+    http.Client? client,
+    String? baseUrl,
+  })  : _client = client ?? http.Client(),
+        _baseUrl = baseUrl ?? AppEnvironment.apiBaseUrl;
 
   final http.Client _client;
+  final String _baseUrl;
 
   static const Duration _timeout = Duration(seconds: 20);
 
@@ -42,7 +47,7 @@ class ApiClient extends GetxService {
   }
 
   Uri _buildUri(String path, [Map<String, String>? queryParameters]) {
-    final String baseUrl = AppEnvironment.apiBaseUrl.trim();
+    final String baseUrl = _baseUrl.trim();
     if (baseUrl.isEmpty) {
       throw const ApiConfigurationException(
         'API_BASE_URL is missing. Start the app with --dart-define=API_BASE_URL=...',
