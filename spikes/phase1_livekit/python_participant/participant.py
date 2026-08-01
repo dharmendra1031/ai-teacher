@@ -104,12 +104,12 @@ async def publish_test_audio(source: rtc.AudioSource, stop_event: asyncio.Event)
     phase = 0.0
     phase_step = 2.0 * math.pi * 440.0 / SAMPLE_RATE
     frame_duration = FRAME_MS / 1000.0
-    next_tone_at = 0.0
     loop = asyncio.get_running_loop()
+    next_tone_at = loop.time()
 
     while not stop_event.is_set():
         now = loop.time()
-        play_tone = now >= next_tone_at and now < next_tone_at + 1.0
+        play_tone = next_tone_at <= now < next_tone_at + 1.0
 
         samples = array("h")
         for _ in range(SAMPLES_PER_FRAME):
@@ -136,18 +136,13 @@ async def publish_test_audio(source: rtc.AudioSource, stop_event: asyncio.Event)
 async def publish_test_video(source: rtc.VideoSource, stop_event: asyncio.Event) -> None:
     frame_index = 0
     frame_interval = 1.0 / VIDEO_FPS
+    pixel_count = VIDEO_WIDTH * VIDEO_HEIGHT
 
     while not stop_event.is_set():
-        buffer = bytearray(VIDEO_WIDTH * VIDEO_HEIGHT * 4)
         red = (40 + frame_index * 3) % 255
         green = (90 + frame_index * 2) % 255
         blue = (180 + frame_index * 5) % 255
-
-        for index in range(0, len(buffer), 4):
-            buffer[index] = red
-            buffer[index + 1] = green
-            buffer[index + 2] = blue
-            buffer[index + 3] = 255
+        buffer = bytearray(bytes((red, green, blue, 255)) * pixel_count)
 
         frame = rtc.VideoFrame(
             VIDEO_WIDTH,
