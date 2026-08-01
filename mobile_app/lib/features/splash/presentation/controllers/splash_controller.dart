@@ -2,6 +2,9 @@ import 'package:ai_teacher/app/routes/app_routes.dart';
 import 'package:get/get.dart';
 
 class SplashController extends GetxController {
+  SplashController({this.autoNavigate = true});
+
+  final bool autoNavigate;
   final RxString statusText = 'Preparing Maya…'.obs;
 
   @override
@@ -20,7 +23,7 @@ class SplashController extends GetxController {
     statusText.value = 'Almost ready…';
 
     await Future<void>.delayed(const Duration(milliseconds: 850));
-    if (isClosed) return;
+    if (isClosed || !autoNavigate) return;
     await Get.offNamed<void>(AppRoutes.onboarding);
   }
 }
