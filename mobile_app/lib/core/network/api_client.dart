@@ -70,23 +70,22 @@ class ApiClient extends GetxService {
     };
 
     try {
-      late final http.Response response;
+      final http.Response response;
 
-      switch (method) {
-        case 'GET':
-          response = await _client
-              .get(uri, headers: requestHeaders)
-              .timeout(_timeout);
-        case 'POST':
-          response = await _client
-              .post(
-                uri,
-                headers: requestHeaders,
-                body: jsonEncode(body ?? <String, dynamic>{}),
-              )
-              .timeout(_timeout);
-        default:
-          throw ApiException('Unsupported HTTP method: $method');
+      if (method == 'GET') {
+        response = await _client
+            .get(uri, headers: requestHeaders)
+            .timeout(_timeout);
+      } else if (method == 'POST') {
+        response = await _client
+            .post(
+              uri,
+              headers: requestHeaders,
+              body: jsonEncode(body ?? <String, dynamic>{}),
+            )
+            .timeout(_timeout);
+      } else {
+        throw ApiException('Unsupported HTTP method: $method');
       }
 
       return _decodeResponse(response);
@@ -110,7 +109,7 @@ class ApiClient extends GetxService {
         : jsonDecode(response.body);
 
     if (!isSuccessful) {
-      final String message = decoded is JsonMap
+      final String message = decoded is Map<String, dynamic>
           ? (decoded['message'] ?? decoded['detail'] ?? 'Request failed').toString()
           : 'Request failed';
 
@@ -120,7 +119,7 @@ class ApiClient extends GetxService {
       );
     }
 
-    if (decoded is! JsonMap) {
+    if (decoded is! Map<String, dynamic>) {
       throw const ApiException('Expected a JSON object from the server.');
     }
 
