@@ -1,0 +1,22 @@
+services:
+  livekit:
+    image: livekit/livekit-server:v1.13.1
+    container_name: ai-teacher-phase1-livekit
+    command:
+      - --config
+      - /etc/livekit/livekit.yaml
+      - --node-ip
+      - ${LIVEKIT_NODE_IP}
+    restart: unless-stopped
+    ports:
+      - "7880:7880/tcp"
+      - "7881:7881/tcp"
+      - "50000-50020:50000-50020/udp"
+    volumes:
+      - ./livekit.yaml:/etc/livekit/livekit.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:7880/"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
