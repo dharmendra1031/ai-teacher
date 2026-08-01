@@ -9,6 +9,7 @@ try {
 
     Write-Host 'Restoring reviewed source files after flutter create...'
     git restore --source=HEAD -- `
+        .gitignore `
         pubspec.yaml `
         analysis_options.yaml `
         README.md `
