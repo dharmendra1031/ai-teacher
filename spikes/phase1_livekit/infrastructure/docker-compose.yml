@@ -14,9 +14,3 @@ services:
       - "50000-50020:50000-50020/udp"
     volumes:
       - ./livekit.yaml:/etc/livekit/livekit.yaml:ro
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:7880/"]
-      interval: 10s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
