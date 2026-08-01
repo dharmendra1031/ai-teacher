@@ -16,6 +16,9 @@ Self-hosted realtime AI English teacher with a realistic speaking avatar.
 - SeaweedFS for later S3-compatible object storage
 - Docker Compose on Ubuntu with NVIDIA GPU workers
 
-The verified technical, licensing, security and change-control baseline is locked in [ARCHITECTURE_LOCK.md](ARCHITECTURE_LOCK.md).
+## Locked project documents
 
-> Do not add or replace a core technology or AI model without an ADR, license review and benchmark.
+- [Architecture and license baseline](ARCHITECTURE_LOCK.md)
+- [Complete phase-by-phase development roadmap](DEVELOPMENT_ROADMAP_LOCK.md)
+
+> Do not add or replace a core technology or AI model without an ADR, license review, benchmark, security review and roadmap-gate update.
