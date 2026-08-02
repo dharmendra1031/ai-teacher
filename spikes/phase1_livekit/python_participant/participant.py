@@ -160,10 +160,26 @@ async def main() -> None:
     room = rtc.Room()
     stop_event = asyncio.Event()
     background_tasks: set[asyncio.Task[Any]] = set()
+    audio_source: rtc.AudioSource | None = None
+    video_source: rtc.VideoSource | None = None
 
     def track_task(task: asyncio.Task[Any]) -> None:
         background_tasks.add(task)
-        task.add_done_callback(background_tasks.discard)
+
+        def on_done(completed: asyncio.Task[Any]) -> None:
+            background_tasks.discard(completed)
+            if completed.cancelled():
+                return
+            exception = completed.exception()
+            if exception is not None:
+                LOGGER.error(
+                    "Background task failed name=%s",
+                    completed.get_name(),
+                    exc_info=(type(exception), exception, exception.__traceback__),
+                )
+                stop_event.set()
+
+        task.add_done_callback(on_done)
 
     @room.on("participant_connected")
     def on_participant_connected(participant: rtc.RemoteParticipant) -> None:
@@ -214,33 +230,54 @@ async def main() -> None:
         LOGGER.info("LiveKit room disconnected")
         stop_event.set()
 
-    LOGGER.info("Connecting url=%s room=%s identity=%s", LIVEKIT_URL, ROOM_NAME, IDENTITY)
-    await room.connect(LIVEKIT_URL, create_participant_token())
-    LOGGER.info("Connected room=%s", room.name)
-
-    audio_source = rtc.AudioSource(SAMPLE_RATE, CHANNELS)
-    audio_track = rtc.LocalAudioTrack.create_audio_track("phase1-test-tone", audio_source)
-    audio_options = rtc.TrackPublishOptions()
-    audio_options.source = rtc.TrackSource.SOURCE_MICROPHONE
-    await room.local_participant.publish_track(audio_track, audio_options)
-    LOGGER.info("Published generated test audio")
-
-    video_source = rtc.VideoSource(VIDEO_WIDTH, VIDEO_HEIGHT)
-    video_track = rtc.LocalVideoTrack.create_video_track("phase1-test-video", video_source)
-    video_options = rtc.TrackPublishOptions()
-    video_options.source = rtc.TrackSource.SOURCE_CAMERA
-    await room.local_participant.publish_track(video_track, video_options)
-    LOGGER.info("Published generated test video")
-
-    track_task(asyncio.create_task(publish_test_audio(audio_source, stop_event)))
-    track_task(asyncio.create_task(publish_test_video(video_source, stop_event)))
-
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         with contextlib.suppress(NotImplementedError):
             loop.add_signal_handler(sig, stop_event.set)
 
     try:
+        LOGGER.info(
+            "Connecting url=%s room=%s identity=%s",
+            LIVEKIT_URL,
+            ROOM_NAME,
+            IDENTITY,
+        )
+        await room.connect(LIVEKIT_URL, create_participant_token())
+        LOGGER.info("Connected room=%s", room.name)
+
+        audio_source = rtc.AudioSource(SAMPLE_RATE, CHANNELS)
+        audio_track = rtc.LocalAudioTrack.create_audio_track(
+            "phase1-test-tone",
+            audio_source,
+        )
+        audio_options = rtc.TrackPublishOptions()
+        audio_options.source = rtc.TrackSource.SOURCE_MICROPHONE
+        await room.local_participant.publish_track(audio_track, audio_options)
+        LOGGER.info("Published generated test audio")
+
+        video_source = rtc.VideoSource(VIDEO_WIDTH, VIDEO_HEIGHT)
+        video_track = rtc.LocalVideoTrack.create_video_track(
+            "phase1-test-video",
+            video_source,
+        )
+        video_options = rtc.TrackPublishOptions()
+        video_options.source = rtc.TrackSource.SOURCE_CAMERA
+        await room.local_participant.publish_track(video_track, video_options)
+        LOGGER.info("Published generated test video")
+
+        track_task(
+            asyncio.create_task(
+                publish_test_audio(audio_source, stop_event),
+                name="test-audio-publisher",
+            )
+        )
+        track_task(
+            asyncio.create_task(
+                publish_test_video(video_source, stop_event),
+                name="test-video-publisher",
+            )
+        )
+
         await stop_event.wait()
     finally:
         stop_event.set()
@@ -249,8 +286,13 @@ async def main() -> None:
         if background_tasks:
             await asyncio.gather(*background_tasks, return_exceptions=True)
 
-        with contextlib.suppress(Exception):
-            await audio_source.aclose()
+        if video_source is not None:
+            with contextlib.suppress(Exception):
+                await video_source.aclose()
+        if audio_source is not None:
+            with contextlib.suppress(Exception):
+                audio_source.clear_queue()
+                await audio_source.aclose()
         with contextlib.suppress(Exception):
             await room.disconnect()
         LOGGER.info("Python participant clean shutdown complete")
