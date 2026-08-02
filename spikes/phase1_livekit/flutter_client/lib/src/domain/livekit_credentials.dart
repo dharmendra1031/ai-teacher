@@ -21,6 +21,16 @@ class LiveKitCredentials {
       throw const FormatException('Token service response is incomplete.');
     }
 
+    final Uri? parsedUrl = Uri.tryParse(url);
+    if (parsedUrl == null ||
+        !parsedUrl.hasScheme ||
+        parsedUrl.host.isEmpty ||
+        !<String>{'ws', 'wss'}.contains(parsedUrl.scheme)) {
+      throw const FormatException(
+        'Token service returned an invalid LiveKit WebSocket URL.',
+      );
+    }
+
     return LiveKitCredentials(
       url: url,
       token: token,
