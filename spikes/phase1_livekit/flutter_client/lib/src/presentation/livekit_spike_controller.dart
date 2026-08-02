@@ -66,22 +66,37 @@ class LiveKitSpikeController extends GetxController
     remoteVideoTrack.value = null;
 
     try {
+      // A previous room may have reached a final disconnected state without the
+      // user pressing Leave. Dispose it before creating a replacement room.
+      await _disposeRoom();
+
       status.value = SpikeConnectionStatus.requestingPermissions;
-      _log('Requesting microphone and camera permissions');
+      _log('Requesting microphone, camera and Bluetooth permissions');
 
       final Map<Permission, PermissionStatus> permissions =
           await <Permission>[
         Permission.microphone,
         Permission.camera,
+        Permission.bluetooth,
+        Permission.bluetoothConnect,
       ].request();
 
       final PermissionStatus microphoneStatus =
           permissions[Permission.microphone] ?? PermissionStatus.denied;
       final PermissionStatus cameraStatus =
           permissions[Permission.camera] ?? PermissionStatus.denied;
+      final PermissionStatus bluetoothStatus =
+          permissions[Permission.bluetooth] ?? PermissionStatus.denied;
+      final PermissionStatus bluetoothConnectStatus =
+          permissions[Permission.bluetoothConnect] ?? PermissionStatus.denied;
 
       if (!microphoneStatus.isGranted) {
         throw StateError('Microphone permission is required for Phase 1.');
+      }
+
+      if (!bluetoothStatus.isGranted &&
+          !bluetoothConnectStatus.isGranted) {
+        _log('Bluetooth permission not granted; headset test may be unavailable');
       }
 
       status.value = SpikeConnectionStatus.fetchingToken;
@@ -97,21 +112,16 @@ class LiveKitSpikeController extends GetxController
       status.value = SpikeConnectionStatus.connecting;
       _log('Preparing LiveKit connection url=${credentials.url}');
 
-      final Room room = Room();
-      _room = room;
-      _attachRoomEvents(room);
-
       const RoomOptions roomOptions = RoomOptions(
         adaptiveStream: true,
         dynacast: true,
       );
+      final Room room = Room(roomOptions: roomOptions);
+      _room = room;
+      _attachRoomEvents(room);
 
       await room.prepareConnection(credentials.url, credentials.token);
-      await room.connect(
-        credentials.url,
-        credentials.token,
-        roomOptions: roomOptions,
-      );
+      await room.connect(credentials.url, credentials.token);
 
       final LocalParticipant? participant = room.localParticipant;
       if (participant == null) {
@@ -143,76 +153,90 @@ class LiveKitSpikeController extends GetxController
   }
 
   Future<void> toggleMicrophone() async {
-    final LocalParticipant? participant = _room?.localParticipant;
-    if (participant == null) return;
+    await _runControl('microphone', () async {
+      final LocalParticipant? participant = _room?.localParticipant;
+      if (participant == null) return;
 
-    final bool nextValue = !microphoneEnabled.value;
-    await participant.setMicrophoneEnabled(nextValue);
-    microphoneEnabled.value = nextValue;
-    _log('Microphone ${nextValue ? 'enabled' : 'muted'}');
+      final bool nextValue = !microphoneEnabled.value;
+      await participant.setMicrophoneEnabled(nextValue);
+      microphoneEnabled.value = nextValue;
+      _log('Microphone ${nextValue ? 'enabled' : 'muted'}');
+    });
   }
 
   Future<void> toggleCamera() async {
-    final LocalParticipant? participant = _room?.localParticipant;
-    if (participant == null) return;
+    await _runControl('camera', () async {
+      final LocalParticipant? participant = _room?.localParticipant;
+      if (participant == null) return;
 
-    final bool nextValue = !cameraEnabled.value;
-    if (nextValue) {
-      final PermissionStatus status = await Permission.camera.request();
-      if (!status.isGranted) {
-        errorMessage.value = 'Camera permission was not granted.';
-        _log(errorMessage.value);
-        return;
+      final bool nextValue = !cameraEnabled.value;
+      if (nextValue) {
+        final PermissionStatus permissionStatus =
+            await Permission.camera.request();
+        if (!permissionStatus.isGranted) {
+          throw StateError('Camera permission was not granted.');
+        }
       }
-    }
 
-    await participant.setCameraEnabled(nextValue);
-    cameraEnabled.value = nextValue;
-    _log('Camera ${nextValue ? 'enabled' : 'disabled'}');
+      await participant.setCameraEnabled(nextValue);
+      cameraEnabled.value = nextValue;
+      _log('Camera ${nextValue ? 'enabled' : 'disabled'}');
+    });
   }
 
   Future<void> switchCamera() async {
-    final LocalParticipant? participant = _room?.localParticipant;
-    if (participant == null || !cameraEnabled.value) return;
+    await _runControl('camera switch', () async {
+      final LocalParticipant? participant = _room?.localParticipant;
+      if (participant == null || !cameraEnabled.value) return;
 
-    final List<MediaDevice> cameras = await Hardware.instance.videoInputs();
-    if (cameras.length < 2) {
-      _log('Camera switch skipped: fewer than two cameras found');
-      return;
-    }
-
-    LocalVideoTrack? cameraTrack;
-    for (final LocalTrackPublication<LocalVideoTrack> publication
-        in participant.videoTrackPublications) {
-      final LocalVideoTrack? track = publication.track;
-      if (track != null) {
-        cameraTrack = track;
-        break;
+      final List<MediaDevice> cameras = await Hardware.instance.videoInputs();
+      if (cameras.length < 2) {
+        _log('Camera switch skipped: fewer than two cameras found');
+        return;
       }
-    }
 
-    if (cameraTrack == null) {
-      _log('Camera switch skipped: local camera track not found');
-      return;
-    }
+      LocalVideoTrack? cameraTrack;
+      for (final LocalTrackPublication<LocalVideoTrack> publication
+          in participant.videoTrackPublications) {
+        final LocalVideoTrack? track = publication.track;
+        if (track != null) {
+          cameraTrack = track;
+          break;
+        }
+      }
 
-    final String? selectedId = Hardware.instance.selectedVideoInput?.deviceId;
-    int currentIndex = cameras.indexWhere(
-      (MediaDevice device) => device.deviceId == selectedId,
-    );
-    if (currentIndex < 0) currentIndex = 0;
+      if (cameraTrack == null) {
+        _log('Camera switch skipped: local camera track not found');
+        return;
+      }
 
-    final MediaDevice nextCamera = cameras[(currentIndex + 1) % cameras.length];
-    await cameraTrack.switchCamera(nextCamera.deviceId, fastSwitch: true);
-    Hardware.instance.selectedVideoInput = nextCamera;
-    _log('Switched camera to ${nextCamera.label}');
+      final String? selectedId =
+          Hardware.instance.selectedVideoInput?.deviceId;
+      int currentIndex = cameras.indexWhere(
+        (MediaDevice device) => device.deviceId == selectedId,
+      );
+      if (currentIndex < 0) currentIndex = 0;
+
+      final MediaDevice nextCamera =
+          cameras[(currentIndex + 1) % cameras.length];
+      await cameraTrack.switchCamera(nextCamera.deviceId, fastSwitch: true);
+      Hardware.instance.selectedVideoInput = nextCamera;
+      _log('Switched camera to ${nextCamera.label}');
+    });
   }
 
   Future<void> toggleSpeaker() async {
-    final bool nextValue = !speakerEnabled.value;
-    await Hardware.instance.setSpeakerphoneOn(nextValue);
-    speakerEnabled.value = nextValue;
-    _log('Speakerphone ${nextValue ? 'enabled' : 'disabled'}');
+    await _runControl('speaker route', () async {
+      if (!Hardware.instance.canSwitchSpeakerphone) {
+        _log('Speakerphone switching is not supported on this device');
+        return;
+      }
+
+      final bool nextValue = !speakerEnabled.value;
+      await Hardware.instance.setSpeakerphoneOn(nextValue);
+      speakerEnabled.value = nextValue;
+      _log('Speakerphone ${nextValue ? 'enabled' : 'disabled'}');
+    });
   }
 
   Future<void> openPermissionSettings() async {
@@ -245,7 +269,7 @@ class LiveKitSpikeController extends GetxController
           'kind=${event.track.kind}',
         );
         if (event.track is RemoteVideoTrack) {
-          remoteVideoTrack.value = event.track;
+          remoteVideoTrack.value = event.track as RemoteVideoTrack;
         }
       })
       ..on<TrackUnsubscribedEvent>((TrackUnsubscribedEvent event) {
@@ -257,7 +281,17 @@ class LiveKitSpikeController extends GetxController
       })
       ..on<RoomReconnectingEvent>((RoomReconnectingEvent event) {
         status.value = SpikeConnectionStatus.reconnecting;
-        _log('Room reconnecting');
+        _log('Room performing full reconnect');
+      })
+      ..on<RoomResumingEvent>((RoomResumingEvent event) {
+        status.value = SpikeConnectionStatus.reconnecting;
+        _log('Room resuming signaling connection');
+      })
+      ..on<RoomAttemptReconnectEvent>((RoomAttemptReconnectEvent event) {
+        _log(
+          'Reconnect attempt ${event.attempt}/${event.maxAttemptsRetry}; '
+          'next delay ${event.nextRetryDelaysInMs} ms',
+        );
       })
       ..on<RoomReconnectedEvent>((RoomReconnectedEvent event) {
         status.value = SpikeConnectionStatus.connected;
@@ -271,7 +305,7 @@ class LiveKitSpikeController extends GetxController
         microphoneEnabled.value = false;
         cameraEnabled.value = false;
         remoteVideoTrack.value = null;
-        _log('Room disconnected');
+        _log('Room disconnected reason=${event.reason}');
       });
   }
 
@@ -295,6 +329,19 @@ class LiveKitSpikeController extends GetxController
     }
 
     remoteVideoTrack.value = null;
+  }
+
+  Future<void> _runControl(
+    String controlName,
+    Future<void> Function() action,
+  ) async {
+    try {
+      errorMessage.value = '';
+      await action();
+    } catch (error) {
+      errorMessage.value = _friendlyError(error);
+      _log('$controlName failed: ${errorMessage.value}');
+    }
   }
 
   Future<void> _disposeRoom() async {
