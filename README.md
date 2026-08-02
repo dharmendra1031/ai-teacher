@@ -753,6 +753,29 @@ Metrics must not require unnecessary raw recording collection।
 
 ## 28. Repository and change-control rules
 
+### Phase 2 developer setup
+
+Pinned local tool targets are Flutter 3.44.0 with Dart 3.12.0, Python 3.12.13 for backend and realtime-agent containers, and Python 3.10 for the future avatar worker. The deployment baseline is Ubuntu 24.04 LTS, Docker Engine 27+ and Docker Compose 2.29+.
+
+On Windows, run these commands from the repository root:
+
+```powershell
+.\scripts\dev.ps1 setup
+.\scripts\dev.ps1 check
+.\scripts\dev.ps1 test
+.\scripts\dev.ps1 up
+```
+
+`setup` creates an ignored `.env` from `.env.example`; replace every example credential before `up`. `test` runs the Python and Flutter checks. `up` starts the non-GPU PostgreSQL, RabbitMQ, LiveKit and backend-placeholder stack. Stop it with `down`.
+
+The following command permanently removes only the Compose-managed local development volumes after validating the repository root:
+
+```powershell
+.\scripts\dev.ps1 reset
+```
+
+Docker is not installed on every Flutter workstation. In that case `check` reports the Compose verification as skipped; CI remains responsible for Compose model validation and CPU-only image build smoke tests.
+
 ### Branch model
 
 ```text

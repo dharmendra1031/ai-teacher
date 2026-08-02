@@ -17,11 +17,7 @@ void main() {
     Get.testMode = true;
     Get.put<SplashController>(SplashController(autoNavigate: false));
 
-    await tester.pumpWidget(
-      const GetMaterialApp(
-        home: SplashPage(),
-      ),
-    );
+    await tester.pumpWidget(const GetMaterialApp(home: SplashPage()));
 
     expect(find.text('AI Teacher'), findsOneWidget);
     expect(find.text('REAL-TIME AI SPEAKING'), findsOneWidget);

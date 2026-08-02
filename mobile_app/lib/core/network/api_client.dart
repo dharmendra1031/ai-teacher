@@ -10,11 +10,9 @@ import 'package:http/http.dart' as http;
 typedef JsonMap = Map<String, dynamic>;
 
 class ApiClient extends GetxService {
-  ApiClient({
-    http.Client? client,
-    String? baseUrl,
-  })  : _client = client ?? http.Client(),
-        _baseUrl = baseUrl ?? AppEnvironment.apiBaseUrl;
+  ApiClient({http.Client? client, String? baseUrl})
+    : _client = client ?? http.Client(),
+      _baseUrl = baseUrl ?? AppEnvironment.apiBaseUrl;
 
   final http.Client _client;
   final String _baseUrl;
@@ -55,11 +53,13 @@ class ApiClient extends GetxService {
     }
 
     final String normalizedBase = baseUrl.endsWith('/') ? baseUrl : '$baseUrl/';
-    final String normalizedPath = path.startsWith('/') ? path.substring(1) : path;
+    final String normalizedPath = path.startsWith('/')
+        ? path.substring(1)
+        : path;
 
-    return Uri.parse(normalizedBase)
-        .resolve(normalizedPath)
-        .replace(queryParameters: queryParameters);
+    return Uri.parse(
+      normalizedBase,
+    ).resolve(normalizedPath).replace(queryParameters: queryParameters);
   }
 
   Future<JsonMap> _send({
@@ -108,20 +108,19 @@ class ApiClient extends GetxService {
   }
 
   JsonMap _decodeResponse(http.Response response) {
-    final bool isSuccessful = response.statusCode >= 200 && response.statusCode < 300;
+    final bool isSuccessful =
+        response.statusCode >= 200 && response.statusCode < 300;
     final Object? decoded = response.body.trim().isEmpty
         ? <String, dynamic>{}
         : jsonDecode(response.body);
 
     if (!isSuccessful) {
       final String message = decoded is Map<String, dynamic>
-          ? (decoded['message'] ?? decoded['detail'] ?? 'Request failed').toString()
+          ? (decoded['message'] ?? decoded['detail'] ?? 'Request failed')
+                .toString()
           : 'Request failed';
 
-      throw ApiException(
-        message,
-        statusCode: response.statusCode,
-      );
+      throw ApiException(message, statusCode: response.statusCode);
     }
 
     if (decoded is! Map<String, dynamic>) {

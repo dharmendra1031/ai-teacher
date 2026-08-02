@@ -60,7 +60,8 @@ class SplashPage extends GetView<SplashController> {
                         Text(
                           'AI Teacher',
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                          style: Theme.of(context).textTheme.displaySmall
+                              ?.copyWith(
                                 color: Colors.white,
                                 fontSize: 34,
                                 height: 1.2,
@@ -72,7 +73,8 @@ class SplashPage extends GetView<SplashController> {
                         Text(
                           'Private practice. Real confidence.',
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
                                 color: const Color(0xFFB8C2DE),
                                 fontSize: 13,
                                 height: 1.5,
@@ -84,7 +86,8 @@ class SplashPage extends GetView<SplashController> {
                         Text(
                           'Your conversation stays private by default',
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
                                 color: const Color(0xFF7F8BAA),
                                 fontSize: 11,
                                 height: 1.4,
@@ -117,10 +120,7 @@ class _BrandLogo extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: <Color>[
-            AppColors.brandBright,
-            AppColors.blue,
-          ],
+          colors: <Color>[AppColors.brandBright, AppColors.blue],
         ),
         border: Border.all(
           color: const Color(0xFF8190C8).withValues(alpha: 0.72),
@@ -150,11 +150,7 @@ class _BrandLogo extends StatelessWidget {
               ),
             ),
           ),
-          const Icon(
-            Icons.auto_awesome_rounded,
-            color: Colors.white,
-            size: 48,
-          ),
+          const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 48),
         ],
       ),
     );
@@ -180,11 +176,11 @@ class _ProductBadge extends StatelessWidget {
       child: Text(
         'REAL-TIME AI SPEAKING',
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: const Color(0xFFCFD6FF),
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.7,
-            ),
+          color: const Color(0xFFCFD6FF),
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.7,
+        ),
       ),
     );
   }
@@ -227,11 +223,11 @@ class _LoadingPanel extends GetView<SplashController> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: Colors.white,
-                        fontSize: 11,
-                        height: 1.3,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    color: Colors.white,
+                    fontSize: 11,
+                    height: 1.3,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),

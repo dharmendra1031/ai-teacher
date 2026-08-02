@@ -36,7 +36,11 @@ void main() {
       throwsA(
         isA<ApiException>()
             .having((ApiException error) => error.statusCode, 'statusCode', 403)
-            .having((ApiException error) => error.message, 'message', 'Not allowed'),
+            .having(
+              (ApiException error) => error.message,
+              'message',
+              'Not allowed',
+            ),
       ),
     );
   });

@@ -5,6 +5,21 @@
 **Verification date:** 2026-08-01  
 **Status:** Approved for phased development, subject to the mandatory gates written below.
 
+### Phase 2 reproducibility baseline
+
+| Component | Locked baseline |
+|---|---|
+| Flutter / Dart | Flutter 3.44.0 / Dart 3.12.0 |
+| Backend and realtime agent | Python 3.12.13 container target |
+| Avatar worker plan | Python 3.10; exact patch and CUDA image deferred to Phase 11 benchmark |
+| PostgreSQL | `postgres:17.10-bookworm` |
+| RabbitMQ | `rabbitmq:4.3.4-management` |
+| LiveKit server | `livekit/livekit-server:v1.13.1` |
+| Local/production OS target | Ubuntu 24.04 LTS |
+| Container tooling minimum | Docker Engine 27+, Docker Compose 2.29+ |
+
+Flutter's `pubspec.lock` is committed. Backend, realtime-agent and avatar locks are separate; the Phase 2 placeholders intentionally have no third-party Python runtime dependencies. GPU model images, packages, weights and digests remain deferred until their mandatory benchmark and license gates, and ordinary CI does not download them.
+
 > किसी core technology, AI model, database, realtime layer, authentication design, broker या storage implementation को बिना ADR, compatibility test, security/privacy review, benchmark और license review के replace नहीं किया जाएगा।
 
 ---

@@ -24,17 +24,17 @@ class OnboardingPlaceholderPage extends StatelessWidget {
                   'Splash screen completed',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   'The next Figma screen will replace this temporary onboarding route.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textMuted,
-                        height: 1.5,
-                      ),
+                    color: AppColors.textMuted,
+                    height: 1.5,
+                  ),
                 ),
               ],
             ),

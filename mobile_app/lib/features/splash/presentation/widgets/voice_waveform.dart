@@ -4,11 +4,7 @@ import 'package:ai_teacher/app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 
 class VoiceWaveform extends StatefulWidget {
-  const VoiceWaveform({
-    super.key,
-    this.barCount = 14,
-    this.height = 22,
-  });
+  const VoiceWaveform({super.key, this.barCount = 14, this.height = 22});
 
   final int barCount;
   final double height;
