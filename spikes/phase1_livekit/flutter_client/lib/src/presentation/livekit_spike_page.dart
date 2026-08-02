@@ -343,7 +343,7 @@ class _LogPanel extends StatelessWidget {
           : ListView.separated(
               shrinkWrap: true,
               itemCount: logs.length,
-              separatorBuilder: (_, __) => const Divider(height: 12),
+              separatorBuilder: (_, _) => const Divider(height: 12),
               itemBuilder: (BuildContext context, int index) {
                 return SelectableText(
                   logs[index],

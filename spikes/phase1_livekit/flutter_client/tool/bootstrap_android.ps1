@@ -86,6 +86,15 @@ try {
 
     Write-Utf8WithoutBom -Path $manifestPath -Content $manifest
 
+    # Kotlin incremental caches cannot safely relativize plugin sources from
+    # the C: Pub cache against this project's D: drive on Windows.
+    $gradlePropertiesPath = Join-Path $projectRoot 'android\gradle.properties'
+    $gradleProperties = Get-Content $gradlePropertiesPath -Raw
+    if ($gradleProperties -notmatch '(?m)^kotlin\.incremental=false\s*$') {
+        $gradleProperties = $gradleProperties.TrimEnd() + "`r`nkotlin.incremental=false`r`n"
+        Write-Utf8WithoutBom -Path $gradlePropertiesPath -Content $gradleProperties
+    }
+
     flutter pub get
     Assert-LastExitCode -Operation 'Flutter dependency installation'
 

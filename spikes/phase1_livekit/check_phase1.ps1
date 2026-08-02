@@ -176,7 +176,10 @@ Write-Check 'Token service generates credentials with the expected public URL' $
 $recordedProcessesAlive = $false
 if (Test-Path $processFile) {
     try {
-        $records = @(Get-Content $processFile -Raw | ConvertFrom-Json)
+        # Windows PowerShell 5.1 already returns a collection for a top-level
+        # JSON array. Wrapping the pipeline in @() can collapse it into one
+        # object whose properties are arrays, which makes every PID check fail.
+        $records = Get-Content $processFile -Raw | ConvertFrom-Json
         $expectedNames = @('livekit', 'token-service', 'python-participant')
         $recordedProcessesAlive = $records.Count -eq $expectedNames.Count
 

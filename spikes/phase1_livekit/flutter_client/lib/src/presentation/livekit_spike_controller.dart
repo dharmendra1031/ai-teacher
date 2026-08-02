@@ -51,7 +51,7 @@ class LiveKitSpikeController extends GetxController
     super.onInit();
     WidgetsBinding.instance.addObserver(this);
     identity.value = 'flutter-${DateTime.now().millisecondsSinceEpoch}';
-    speakerEnabled.value = AudioManager.instance.isSpeakerOutputPreferred;
+    speakerEnabled.value = Hardware.instance.preferSpeakerOutput;
     _log('Controller ready identity=${identity.value}');
   }
 
@@ -224,14 +224,15 @@ class LiveKitSpikeController extends GetxController
 
   Future<void> toggleSpeaker() async {
     await _runControl('speaker route', () async {
-      final AudioManager audioManager = AudioManager.instance;
-      if (!audioManager.canSwitchSpeakerphone) {
+      if (!Hardware.instance.canSwitchSpeakerphone) {
         _log('Speakerphone switching is not supported on this device');
         return;
       }
 
       final bool nextValue = !speakerEnabled.value;
-      await audioManager.setSpeakerOutputPreferred(nextValue);
+      final Room? room = _room;
+      if (room == null) return;
+      await room.setSpeakerOn(nextValue);
       speakerEnabled.value = nextValue;
       _log('Speakerphone ${nextValue ? 'enabled' : 'disabled'}');
     });
