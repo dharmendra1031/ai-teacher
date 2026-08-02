@@ -9,6 +9,7 @@ import signal
 from array import array
 from datetime import timedelta
 from typing import Any
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 from livekit import api, rtc
@@ -46,11 +47,21 @@ def require_environment() -> None:
             "LIVEKIT_PUBLIC_URL": LIVEKIT_URL,
             "LIVEKIT_API_KEY": API_KEY,
             "LIVEKIT_API_SECRET": API_SECRET,
+            "ROOM_NAME": ROOM_NAME,
+            "PYTHON_PARTICIPANT_ID": IDENTITY,
         }.items()
         if not value
     ]
     if missing:
         raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")
+
+    parsed_url = urlparse(LIVEKIT_URL)
+    if parsed_url.scheme not in {"ws", "wss"} or not parsed_url.hostname:
+        raise RuntimeError("LIVEKIT_PUBLIC_URL must be a valid ws:// or wss:// URL")
+    if len(ROOM_NAME) > 64 or len(IDENTITY) > 64:
+        raise RuntimeError("ROOM_NAME and PYTHON_PARTICIPANT_ID must be 64 characters or fewer")
+    if IDENTITY.startswith("flutter-") or IDENTITY.startswith("phase1-check-"):
+        raise RuntimeError("PYTHON_PARTICIPANT_ID must not use a Flutter/checker identity prefix")
 
 
 def create_participant_token() -> str:
@@ -243,6 +254,8 @@ async def main() -> None:
             IDENTITY,
         )
         await room.connect(LIVEKIT_URL, create_participant_token())
+        if room.local_participant is None:
+            raise RuntimeError("LiveKit connected without a local participant")
         LOGGER.info("Connected room=%s", room.name)
 
         audio_source = rtc.AudioSource(SAMPLE_RATE, CHANNELS)
