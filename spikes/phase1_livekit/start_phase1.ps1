@@ -97,7 +97,7 @@ try {
     Write-Host 'Starting native LiveKit Server...' -ForegroundColor Cyan
     $livekitStart = @{
         FilePath               = $livekitExecutable
-        ArgumentList           = @('--config', $livekitConfig, '--node-ip', $env:LIVEKIT_NODE_IP)
+        ArgumentList           = @('--config', 'infrastructure\livekit.yaml', '--node-ip', $env:LIVEKIT_NODE_IP)
         WorkingDirectory       = $root
         RedirectStandardOutput = (Join-Path $runtimeDirectory 'livekit.out.log')
         RedirectStandardError  = (Join-Path $runtimeDirectory 'livekit.err.log')
@@ -110,7 +110,7 @@ try {
     Write-Host 'Starting development token service...' -ForegroundColor Cyan
     $tokenStart = @{
         FilePath               = $tokenPython
-        ArgumentList           = @((Join-Path $root 'token_service\server.py'))
+        ArgumentList           = @('token_service\server.py')
         WorkingDirectory       = $root
         RedirectStandardOutput = (Join-Path $runtimeDirectory 'token-service.out.log')
         RedirectStandardError  = (Join-Path $runtimeDirectory 'token-service.err.log')
@@ -128,7 +128,7 @@ try {
     Write-Host 'Starting Python test participant...' -ForegroundColor Cyan
     $participantStart = @{
         FilePath               = $participantPython
-        ArgumentList           = @((Join-Path $root 'python_participant\participant.py'))
+        ArgumentList           = @('python_participant\participant.py')
         WorkingDirectory       = $root
         RedirectStandardOutput = (Join-Path $runtimeDirectory 'python-participant.out.log')
         RedirectStandardError  = (Join-Path $runtimeDirectory 'python-participant.err.log')
