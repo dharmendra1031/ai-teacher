@@ -7,6 +7,8 @@ $ErrorActionPreference = 'Stop'
 $phaseRoot = Split-Path -Parent $PSScriptRoot
 $envExamplePath = Join-Path $phaseRoot '.env.example'
 $envPath = Join-Path $phaseRoot '.env'
+$signalingRuleName = 'AI Teacher LiveKit Signaling'
+$mediaRuleName = 'AI Teacher LiveKit Media'
 
 function Get-EnvironmentValue {
     param(
@@ -32,6 +34,13 @@ function Get-LanIpv4Candidates {
     )
 
     foreach ($adapter in $physicalAdapters) {
+        $interface = Get-NetIPInterface `
+            -AddressFamily IPv4 `
+            -InterfaceIndex $adapter.ifIndex `
+            -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        $metric = if ($interface) { [int]$interface.InterfaceMetric } else { 9999 }
+
         $addresses = @(
             Get-NetIPAddress `
                 -AddressFamily IPv4 `
@@ -57,7 +66,7 @@ function Get-LanIpv4Candidates {
                 IPAddress = $address.IPAddress
                 InterfaceAlias = $adapter.Name
                 Priority = $priority
-                InterfaceMetric = [int]($address.InterfaceMetric)
+                InterfaceMetric = $metric
             }
         }
     }
@@ -209,35 +218,41 @@ if (Test-Path $envPath) {
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = [Security.Principal.WindowsPrincipal]::new($identity)
 $isAdministrator = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+$existingSignalingRule = Get-NetFirewallRule -DisplayName $signalingRuleName -ErrorAction SilentlyContinue
+$existingMediaRule = Get-NetFirewallRule -DisplayName $mediaRuleName -ErrorAction SilentlyContinue
 
 if ($isAdministrator) {
-    if (-not (Get-NetFirewallRule -DisplayName 'AI Teacher LiveKit Signaling' -ErrorAction SilentlyContinue)) {
-        $signalingRule = @{
-            DisplayName = 'AI Teacher LiveKit Signaling'
-            Direction   = 'Inbound'
-            Protocol    = 'TCP'
-            LocalPort   = 7880, 7881, 8090
-            Action      = 'Allow'
-        }
-        New-NetFirewallRule @signalingRule | Out-Null
-    }
+    @($existingSignalingRule) | Remove-NetFirewallRule -ErrorAction SilentlyContinue
+    @($existingMediaRule) | Remove-NetFirewallRule -ErrorAction SilentlyContinue
 
-    if (-not (Get-NetFirewallRule -DisplayName 'AI Teacher LiveKit Media' -ErrorAction SilentlyContinue)) {
-        $mediaRule = @{
-            DisplayName = 'AI Teacher LiveKit Media'
-            Direction   = 'Inbound'
-            Protocol    = 'UDP'
-            LocalPort   = '50000-50020'
-            Action      = 'Allow'
-        }
-        New-NetFirewallRule @mediaRule | Out-Null
+    $signalingRule = @{
+        DisplayName = $signalingRuleName
+        Direction   = 'Inbound'
+        Protocol    = 'TCP'
+        LocalPort   = 7880, 7881, 8090
+        Action      = 'Allow'
+        Enabled     = 'True'
+        Profile     = 'Any'
     }
+    New-NetFirewallRule @signalingRule | Out-Null
 
-    Write-Host 'Windows Firewall rules are ready.' -ForegroundColor Green
+    $mediaRule = @{
+        DisplayName = $mediaRuleName
+        Direction   = 'Inbound'
+        Protocol    = 'UDP'
+        LocalPort   = '50000-50020'
+        Action      = 'Allow'
+        Enabled     = 'True'
+        Profile     = 'Any'
+    }
+    New-NetFirewallRule @mediaRule | Out-Null
+
+    Write-Host 'Windows Firewall rules were recreated with the exact Phase 1 ports.' -ForegroundColor Green
+} elseif (-not $existingSignalingRule -or -not $existingMediaRule) {
+    throw 'Required Windows Firewall rules are missing. Run setup_phase1.ps1 once from an Administrator PowerShell window.'
 } else {
     Write-Host ''
-    Write-Host 'Firewall rules were not added because PowerShell is not running as Administrator.' -ForegroundColor Yellow
-    Write-Host 'Run this same setup script once from an Administrator PowerShell window.'
+    Write-Host 'Existing Phase 1 firewall rules were found. Run as Administrator to recreate and refresh them.' -ForegroundColor Yellow
 }
 
 Write-Host ''
@@ -245,5 +260,5 @@ Write-Host 'Setup complete.' -ForegroundColor Green
 Write-Host "Selected LAN IP: $resolvedLanIp"
 Write-Host "Selected interface: $interfaceName"
 Write-Host 'Confirm the phone and this interface are on the same local network.'
-Write-Host 'To override detection: .\infrastructure\setup_windows.ps1 -LanIp 192.168.x.x'
+Write-Host 'To override detection: .\setup_phase1.ps1 -LanIp 192.168.x.x'
 Write-Host 'Next: powershell -ExecutionPolicy Bypass -File .\validate.ps1'
