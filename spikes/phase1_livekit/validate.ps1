@@ -4,6 +4,14 @@ $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $liveKitExecutable = Join-Path $root 'infrastructure\bin\livekit-server.exe'
 Push-Location $root
 
+function Assert-LastExitCode {
+    param([Parameter(Mandatory = $true)][string]$Operation)
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Operation failed with exit code $LASTEXITCODE."
+    }
+}
+
 function Import-DotEnvValues {
     param([Parameter(Mandatory = $true)][string]$Path)
 
@@ -56,11 +64,11 @@ try {
         throw "Python launcher 'py' was not found in PATH."
     }
     py -3.12 --version
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Python 3.12 is not installed or is unavailable through py -3.12.'
-    }
+    Assert-LastExitCode -Operation 'Python 3.12 check'
     py -3.12 -m py_compile token_service\server.py
+    Assert-LastExitCode -Operation 'Token-service Python syntax check'
     py -3.12 -m py_compile python_participant\participant.py
+    Assert-LastExitCode -Operation 'Python-participant syntax check'
 
     Write-Host '3/6 Native LiveKit and environment checks'
     if (-not (Test-Path .env)) {
@@ -70,9 +78,7 @@ try {
         throw 'Native LiveKit Server is not installed. Run .\setup_phase1.ps1 first.'
     }
     & $liveKitExecutable --version
-    if ($LASTEXITCODE -ne 0) {
-        throw 'LiveKit Server version check failed.'
-    }
+    Assert-LastExitCode -Operation 'LiveKit Server version check'
 
     $envValues = Import-DotEnvValues -Path '.env'
     foreach ($requiredName in @(
@@ -93,12 +99,17 @@ try {
         throw "LIVEKIT_NODE_IP is not a valid IP address: $nodeIp"
     }
 
-    $liveKitUri = [Uri]$envValues['LIVEKIT_PUBLIC_URL']
-    $tokenUri = [Uri]$envValues['TOKEN_SERVICE_PUBLIC_URL']
-    if ($liveKitUri.Scheme -notin @('ws', 'wss') -or $liveKitUri.Host -ne $nodeIp -or $liveKitUri.Port -ne 7880) {
+    try {
+        $liveKitUri = [Uri]$envValues['LIVEKIT_PUBLIC_URL']
+        $tokenUri = [Uri]$envValues['TOKEN_SERVICE_PUBLIC_URL']
+    } catch {
+        throw 'LIVEKIT_PUBLIC_URL or TOKEN_SERVICE_PUBLIC_URL is not a valid absolute URL.'
+    }
+
+    if (-not $liveKitUri.IsAbsoluteUri -or $liveKitUri.Scheme -notin @('ws', 'wss') -or $liveKitUri.Host -ne $nodeIp -or $liveKitUri.Port -ne 7880) {
         throw 'LIVEKIT_PUBLIC_URL must use LIVEKIT_NODE_IP and port 7880 with ws:// or wss://.'
     }
-    if ($tokenUri.Scheme -notin @('http', 'https') -or $tokenUri.Host -ne $nodeIp -or $tokenUri.Port -ne 8090) {
+    if (-not $tokenUri.IsAbsoluteUri -or $tokenUri.Scheme -notin @('http', 'https') -or $tokenUri.Host -ne $nodeIp -or $tokenUri.Port -ne 8090) {
         throw 'TOKEN_SERVICE_PUBLIC_URL must use LIVEKIT_NODE_IP and port 8090.'
     }
 
@@ -127,10 +138,13 @@ try {
     Push-Location flutter_client
     try {
         flutter pub get
+        Assert-LastExitCode -Operation 'Flutter dependency resolution'
         flutter analyze
+        Assert-LastExitCode -Operation 'Flutter static analysis'
 
         Write-Host '6/6 Flutter tests'
         flutter test
+        Assert-LastExitCode -Operation 'Flutter tests'
     } finally {
         Pop-Location
     }
