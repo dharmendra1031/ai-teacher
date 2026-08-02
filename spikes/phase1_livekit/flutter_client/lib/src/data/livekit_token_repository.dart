@@ -63,6 +63,8 @@ class LiveKitTokenRepository {
           .timeout(const Duration(seconds: 15));
     } on TimeoutException {
       throw StateError('Token service request timed out.');
+    } on http.ClientException catch (error) {
+      throw StateError('Cannot reach token service: ${error.message}');
     }
 
     final String responseBody = response.body.trim();
@@ -90,7 +92,15 @@ class LiveKitTokenRepository {
       throw const FormatException('Token service did not return a JSON object.');
     }
 
-    return LiveKitCredentials.fromJson(decoded);
+    final LiveKitCredentials credentials =
+        LiveKitCredentials.fromJson(decoded);
+    if (credentials.room != room || credentials.identity != identity) {
+      throw const FormatException(
+        'Token service returned credentials for a different room or identity.',
+      );
+    }
+
+    return credentials;
   }
 
   void close() {
