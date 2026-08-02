@@ -7,12 +7,15 @@ import re
 from datetime import timedelta
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from dotenv import load_dotenv
 from livekit import api
 
-load_dotenv()
+PHASE_ROOT = Path(__file__).resolve().parents[1]
+ENV_PATH = PHASE_ROOT / ".env"
+load_dotenv(ENV_PATH)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,6 +36,9 @@ MAX_DISPLAY_NAME_LENGTH = 80
 
 
 def validate_environment() -> None:
+    if not ENV_PATH.is_file():
+        raise RuntimeError(f"Missing environment file: {ENV_PATH}")
+
     missing = [
         name
         for name, value in {
@@ -169,8 +175,6 @@ def main() -> None:
     except KeyboardInterrupt:
         LOGGER.info("Token service stopping")
     finally:
-        # serve_forever has already unwound at this point. Calling shutdown()
-        # from this same thread is unnecessary and can deadlock on some runtimes.
         server.server_close()
 
 
