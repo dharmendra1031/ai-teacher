@@ -169,7 +169,8 @@ def main() -> None:
     except KeyboardInterrupt:
         LOGGER.info("Token service stopping")
     finally:
-        server.shutdown()
+        # serve_forever has already unwound at this point. Calling shutdown()
+        # from this same thread is unnecessary and can deadlock on some runtimes.
         server.server_close()
 
 
