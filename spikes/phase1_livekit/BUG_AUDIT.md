@@ -37,6 +37,7 @@ A source fix is not treated as runtime proof. `validate.ps1` must pass on the Wi
 | P1-BUG-018 | Medium | Checker validated token-service health but not real token generation. | Added a complete credential-generation smoke request. |
 | P1-BUG-019 | Medium | LiveKit installer did not fail on an empty archive or failed binary version command. | Added archive and executable exit-code verification. |
 | P1-BUG-020 | Medium | Flutter speaker routing used deprecated SDK methods. | Migrated to `AudioManager`. |
+| P1-BUG-021 | High | Existing local Android wrappers skipped new manifest and permission fixes during setup. | Setup now runs the idempotent Android bootstrap every time. |
 
 ## Added automated coverage
 
