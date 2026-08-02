@@ -1,10 +1,20 @@
 $ErrorActionPreference = 'Stop'
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
+
+function Assert-LastExitCode {
+    param([Parameter(Mandatory = $true)][string]$Operation)
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Operation failed with exit code $LASTEXITCODE."
+    }
+}
+
 Push-Location $projectRoot
 
 try {
     flutter create --platforms=android --org com.aiteacher.phase1 --project-name ai_teacher_phase1_livekit .
+    Assert-LastExitCode -Operation 'Flutter Android wrapper generation'
 
     # flutter create generates a default widget test that references MyApp. Remove
     # generated tests and restore only the reviewed tests committed to this spike.
@@ -16,6 +26,7 @@ try {
         lib `
         test `
         tool
+    Assert-LastExitCode -Operation 'Reviewed Flutter source restoration'
 
     $manifestPath = Join-Path $projectRoot 'android\app\src\main\AndroidManifest.xml'
     $manifest = Get-Content $manifestPath -Raw
@@ -59,6 +70,7 @@ try {
     Set-Content -Path $manifestPath -Value $manifest -Encoding UTF8
 
     flutter pub get
+    Assert-LastExitCode -Operation 'Flutter dependency installation'
 
     Write-Host ''
     Write-Host 'Phase 1 Android client bootstrap complete.' -ForegroundColor Green
