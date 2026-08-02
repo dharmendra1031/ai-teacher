@@ -273,7 +273,7 @@ A ticket is done only when:
 **Goal:** Reproducible multi-service development foundation।  
 **Expected effort:** 5–10 days.
 
-**Implementation status (2026-08-02):** Scaffolding, locks, environment template, non-GPU Compose model, developer commands and CI jobs implemented. Local Python/Flutter/static checks pass. Final exit-gate evidence remains pending for an actual Docker Compose startup and hosted CI run because Docker is not installed on the current Windows workstation.
+**Implementation status (2026-08-02): COMPLETE.** Scaffolding, locks, environment template, non-GPU Compose stack, developer commands and CI jobs are implemented. Local Python/Flutter/static checks pass. Hosted CI builds and starts PostgreSQL, RabbitMQ, LiveKit and the backend, waits for every health check, probes the HTTP health endpoints and performs a clean volume teardown.
 
 ## 2.1 Repository structure
 
