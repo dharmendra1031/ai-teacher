@@ -48,7 +48,7 @@ Write-Host "LAN address: ws://$nodeIp`:7880"
 Write-Host 'Press Ctrl+C in this window to stop LiveKit.'
 Write-Host ''
 
-& $executablePath --config $configPath --node-ip $nodeIp
+& $executablePath --config $configPath --bind 0.0.0.0 --node-ip $nodeIp
 
 if ($LASTEXITCODE -ne 0) {
     throw "LiveKit Server exited with code $LASTEXITCODE."
