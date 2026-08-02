@@ -1,5 +1,6 @@
 param(
-    [switch]$SkipFlutter
+    [switch]$SkipFlutter,
+    [string]$LanIp
 )
 
 $ErrorActionPreference = 'Stop'
@@ -36,7 +37,12 @@ if (-not $SkipFlutter) {
 }
 
 Write-Host '1/4 Preparing native LiveKit Server and local environment...'
-& (Join-Path $root 'infrastructure\setup_windows.ps1')
+$windowsSetup = Join-Path $root 'infrastructure\setup_windows.ps1'
+if ($LanIp) {
+    & $windowsSetup -LanIp $LanIp
+} else {
+    & $windowsSetup
+}
 
 Write-Host ''
 Write-Host '2/4 Preparing development token service...'
