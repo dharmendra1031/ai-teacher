@@ -17,7 +17,7 @@ if ((Test-Path $executablePath) -and -not $Force) {
     Write-Host 'LiveKit Server is already installed at:' -ForegroundColor Green
     Write-Host $executablePath
     & $executablePath --version
-    exit 0
+    return
 }
 
 $tempDirectory = Join-Path $env:TEMP "ai-teacher-livekit-$version"
