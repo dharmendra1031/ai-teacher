@@ -54,9 +54,9 @@ class LiveKitSpikePage extends GetView<LiveKitSpikeController> {
               const SizedBox(height: 20),
               Text(
                 'Diagnostic log',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 8),
               _LogPanel(logs: controller.logs),
@@ -180,9 +180,9 @@ class _ConnectionSummary extends StatelessWidget {
           children: <Widget>[
             Text(
               'Physical-device transport check',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 10),
             Text('Room: ${controller.roomName.value}'),
@@ -198,10 +198,7 @@ class _ConnectionSummary extends StatelessWidget {
 }
 
 class _ErrorPanel extends StatelessWidget {
-  const _ErrorPanel({
-    required this.message,
-    required this.onOpenSettings,
-  });
+  const _ErrorPanel({required this.message, required this.onOpenSettings});
 
   final String message;
   final Future<void> Function() onOpenSettings;
@@ -254,7 +251,9 @@ class _CallControls extends StatelessWidget {
               icon: controller.cameraEnabled.value
                   ? Icons.videocam
                   : Icons.videocam_off,
-              label: controller.cameraEnabled.value ? 'Camera off' : 'Camera on',
+              label: controller.cameraEnabled.value
+                  ? 'Camera off'
+                  : 'Camera on',
               onPressed: controller.toggleCamera,
             ),
             _ControlButton(

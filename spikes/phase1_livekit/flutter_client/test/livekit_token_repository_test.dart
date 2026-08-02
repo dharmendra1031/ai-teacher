@@ -93,7 +93,9 @@ void main() {
 
   test('fetchCredentials rejects invalid service URLs before networking', () {
     final LiveKitTokenRepository repository = LiveKitTokenRepository(
-      client: MockClient((http.Request request) async => http.Response('{}', 200)),
+      client: MockClient(
+        (http.Request request) async => http.Response('{}', 200),
+      ),
       tokenServiceUrl: 'not-a-url',
     );
 
@@ -160,29 +162,32 @@ void main() {
     repository.close();
   });
 
-  test('fetchCredentials converts client failures into a readable error', () async {
-    final MockClient client = MockClient((http.Request request) async {
-      throw http.ClientException('connection refused', request.url);
-    });
-    final LiveKitTokenRepository repository = LiveKitTokenRepository(
-      client: client,
-      tokenServiceUrl: 'http://192.168.1.20:8090',
-    );
+  test(
+    'fetchCredentials converts client failures into a readable error',
+    () async {
+      final MockClient client = MockClient((http.Request request) async {
+        throw http.ClientException('connection refused', request.url);
+      });
+      final LiveKitTokenRepository repository = LiveKitTokenRepository(
+        client: client,
+        tokenServiceUrl: 'http://192.168.1.20:8090',
+      );
 
-    expect(
-      repository.fetchCredentials(
-        room: 'phase1-room',
-        identity: 'flutter-test',
-        displayName: 'Flutter Test',
-      ),
-      throwsA(
-        isA<StateError>().having(
-          (StateError error) => error.message,
-          'message',
-          contains('Cannot reach token service'),
+      expect(
+        repository.fetchCredentials(
+          room: 'phase1-room',
+          identity: 'flutter-test',
+          displayName: 'Flutter Test',
         ),
-      ),
-    );
-    repository.close();
-  });
+        throwsA(
+          isA<StateError>().having(
+            (StateError error) => error.message,
+            'message',
+            contains('Cannot reach token service'),
+          ),
+        ),
+      );
+      repository.close();
+    },
+  );
 }

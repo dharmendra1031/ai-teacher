@@ -5,12 +5,10 @@ import 'package:ai_teacher_phase1_livekit/src/domain/livekit_credentials.dart';
 import 'package:http/http.dart' as http;
 
 class LiveKitTokenRepository {
-  LiveKitTokenRepository({
-    http.Client? client,
-    String? tokenServiceUrl,
-  })  : _client = client ?? http.Client(),
-        _tokenServiceUrl = tokenServiceUrl ??
-            const String.fromEnvironment('TOKEN_SERVICE_URL');
+  LiveKitTokenRepository({http.Client? client, String? tokenServiceUrl})
+    : _client = client ?? http.Client(),
+      _tokenServiceUrl =
+          tokenServiceUrl ?? const String.fromEnvironment('TOKEN_SERVICE_URL');
 
   final http.Client _client;
   final String _tokenServiceUrl;
@@ -43,22 +41,22 @@ class LiveKitTokenRepository {
       query: null,
       fragment: null,
     );
-    final Uri uri = normalizedBaseUri.resolve('token').replace(
-      queryParameters: <String, String>{
-        'room': room,
-        'identity': identity,
-        'name': displayName,
-      },
-    );
+    final Uri uri = normalizedBaseUri
+        .resolve('token')
+        .replace(
+          queryParameters: <String, String>{
+            'room': room,
+            'identity': identity,
+            'name': displayName,
+          },
+        );
 
     late final http.Response response;
     try {
       response = await _client
           .get(
             uri,
-            headers: const <String, String>{
-              'Accept': 'application/json',
-            },
+            headers: const <String, String>{'Accept': 'application/json'},
           )
           .timeout(const Duration(seconds: 15));
     } on TimeoutException {
@@ -74,9 +72,7 @@ class LiveKitTokenRepository {
         decoded = jsonDecode(responseBody);
       } on FormatException {
         if (response.statusCode >= 200 && response.statusCode < 300) {
-          throw const FormatException(
-            'Token service returned invalid JSON.',
-          );
+          throw const FormatException('Token service returned invalid JSON.');
         }
       }
     }
@@ -89,11 +85,12 @@ class LiveKitTokenRepository {
     }
 
     if (decoded is! Map<String, dynamic>) {
-      throw const FormatException('Token service did not return a JSON object.');
+      throw const FormatException(
+        'Token service did not return a JSON object.',
+      );
     }
 
-    final LiveKitCredentials credentials =
-        LiveKitCredentials.fromJson(decoded);
+    final LiveKitCredentials credentials = LiveKitCredentials.fromJson(decoded);
     if (credentials.room != room || credentials.identity != identity) {
       throw const FormatException(
         'Token service returned credentials for a different room or identity.',

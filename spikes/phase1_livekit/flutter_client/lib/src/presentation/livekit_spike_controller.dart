@@ -40,11 +40,11 @@ class LiveKitSpikeController extends GetxController
   bool get isConnected => status.value == SpikeConnectionStatus.connected;
 
   bool get isBusy => <SpikeConnectionStatus>{
-        SpikeConnectionStatus.requestingPermissions,
-        SpikeConnectionStatus.fetchingToken,
-        SpikeConnectionStatus.connecting,
-        SpikeConnectionStatus.reconnecting,
-      }.contains(status.value);
+    SpikeConnectionStatus.requestingPermissions,
+    SpikeConnectionStatus.fetchingToken,
+    SpikeConnectionStatus.connecting,
+    SpikeConnectionStatus.reconnecting,
+  }.contains(status.value);
 
   @override
   void onInit() {
@@ -72,8 +72,7 @@ class LiveKitSpikeController extends GetxController
       status.value = SpikeConnectionStatus.requestingPermissions;
       _log('Requesting microphone, camera and Bluetooth permissions');
 
-      final Map<Permission, PermissionStatus> permissions =
-          await <Permission>[
+      final Map<Permission, PermissionStatus> permissions = await <Permission>[
         Permission.microphone,
         Permission.camera,
         Permission.bluetooth,
@@ -93,20 +92,21 @@ class LiveKitSpikeController extends GetxController
         throw StateError('Microphone permission is required for Phase 1.');
       }
 
-      if (!bluetoothStatus.isGranted &&
-          !bluetoothConnectStatus.isGranted) {
-        _log('Bluetooth permission not granted; headset test may be unavailable');
+      if (!bluetoothStatus.isGranted && !bluetoothConnectStatus.isGranted) {
+        _log(
+          'Bluetooth permission not granted; headset test may be unavailable',
+        );
       }
 
       status.value = SpikeConnectionStatus.fetchingToken;
       _log('Fetching development room token');
 
-      final LiveKitCredentials credentials =
-          await _tokenRepository.fetchCredentials(
-        room: roomName.value,
-        identity: identity.value,
-        displayName: 'Flutter Physical Device',
-      );
+      final LiveKitCredentials credentials = await _tokenRepository
+          .fetchCredentials(
+            room: roomName.value,
+            identity: identity.value,
+            displayName: 'Flutter Physical Device',
+          );
 
       status.value = SpikeConnectionStatus.connecting;
       _log('Preparing LiveKit connection url=${credentials.url}');
@@ -142,7 +142,9 @@ class LiveKitSpikeController extends GetxController
 
       status.value = SpikeConnectionStatus.connected;
       _refreshRemoteVideo();
-      _log('Connected room=${credentials.room} identity=${credentials.identity}');
+      _log(
+        'Connected room=${credentials.room} identity=${credentials.identity}',
+      );
     } catch (error) {
       errorMessage.value = _friendlyError(error);
       status.value = SpikeConnectionStatus.error;
@@ -170,8 +172,8 @@ class LiveKitSpikeController extends GetxController
 
       final bool nextValue = !cameraEnabled.value;
       if (nextValue) {
-        final PermissionStatus permissionStatus =
-            await Permission.camera.request();
+        final PermissionStatus permissionStatus = await Permission.camera
+            .request();
         if (!permissionStatus.isGranted) {
           throw StateError('Camera permission was not granted.');
         }

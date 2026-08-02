@@ -1,5 +1,6 @@
 .env
 .runtime/
+runtime/
 **/.venv/
 **/__pycache__/
 **/*.pyc
@@ -8,6 +9,11 @@
 **/.flutter-plugins
 **/.flutter-plugins-dependencies
 flutter_client/android/
+flutter_client/.gitignore
+flutter_client/.metadata
+flutter_client/README.md
+flutter_client/analysis_options.yaml
+flutter_client/pubspec.lock
 **/android/.gradle/
 **/android/local.properties
 infrastructure/bin/
