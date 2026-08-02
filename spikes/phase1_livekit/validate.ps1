@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$liveKitExecutable = Join-Path $root 'infrastructure\bin\livekit-server.exe'
 Push-Location $root
 
 try {
@@ -8,11 +9,30 @@ try {
     py -3.12 -m py_compile token_service\server.py
     py -3.12 -m py_compile python_participant\participant.py
 
-    Write-Host '2/4 Docker Compose validation'
+    Write-Host '2/4 Native LiveKit and environment checks'
     if (-not (Test-Path .env)) {
-        throw 'Missing .env. Copy .env.example to .env and set the laptop LAN IP.'
+        throw 'Missing .env. Run .\infrastructure\setup_windows.ps1 first.'
     }
-    docker compose --env-file .env -f infrastructure\docker-compose.yml config | Out-Null
+    if (-not (Test-Path $liveKitExecutable)) {
+        throw 'Native LiveKit Server is not installed. Run .\infrastructure\setup_windows.ps1 first.'
+    }
+    & $liveKitExecutable --version
+    if ($LASTEXITCODE -ne 0) {
+        throw 'LiveKit Server version check failed.'
+    }
+
+    $envContent = Get-Content .env -Raw
+    foreach ($requiredName in @(
+        'LIVEKIT_API_KEY',
+        'LIVEKIT_API_SECRET',
+        'LIVEKIT_NODE_IP',
+        'LIVEKIT_PUBLIC_URL',
+        'TOKEN_SERVICE_PUBLIC_URL'
+    )) {
+        if ($envContent -notmatch "(?m)^$requiredName=.+$") {
+            throw "Missing or empty $requiredName in .env."
+        }
+    }
 
     Write-Host '3/4 Flutter dependency resolution'
     Push-Location flutter_client
@@ -28,6 +48,7 @@ try {
 
     Write-Host ''
     Write-Host 'Phase 1 pre-device validation passed.' -ForegroundColor Green
+    Write-Host 'Docker is not required.'
     Write-Host 'This does not replace the physical Android media and reconnect tests.'
 } finally {
     Pop-Location
