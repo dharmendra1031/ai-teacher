@@ -1,0 +1,118 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 18px;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--figma-color-bg);
+      color: var(--figma-color-text);
+    }
+    .hero {
+      padding: 16px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #6C5CE7, #4C7DF0);
+      color: white;
+      margin-bottom: 16px;
+    }
+    .eyebrow { font-size: 11px; opacity: .78; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { font-size: 20px; line-height: 1.25; margin: 6px 0 6px; }
+    .hero p { font-size: 12px; line-height: 1.5; margin: 0; opacity: .9; }
+    .panel {
+      border: 1px solid var(--figma-color-border);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 12px;
+      background: var(--figma-color-bg-secondary);
+    }
+    .panel-title { font-size: 13px; font-weight: 650; margin-bottom: 8px; }
+    .meta { font-size: 11px; color: var(--figma-color-text-secondary); line-height: 1.5; }
+    button {
+      width: 100%;
+      min-height: 42px;
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-weight: 650;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .primary { background: #6C5CE7; color: white; }
+    .secondary { background: var(--figma-color-bg-tertiary); color: var(--figma-color-text); }
+    .danger { background: #FFE7EB; color: #B4233C; }
+    button:disabled { opacity: .55; cursor: wait; }
+    #progress {
+      min-height: 46px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: var(--figma-color-bg-tertiary);
+      font-size: 11px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+    .footer { font-size: 10px; line-height: 1.45; color: var(--figma-color-text-tertiary); margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <div class="eyebrow">Local Figma Plugin</div>
+    <h1>AI Teacher UI Generator</h1>
+    <p>Generate an editable design system and Android MVP screens without any network calls.</p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Generate</div>
+    <div class="meta">Uses exactly three pages to stay compatible with the Figma Starter page limit.</div>
+    <button class="primary" data-action="generate-full">Generate Full UI</button>
+    <button class="secondary" data-action="generate-foundations">Generate Foundations + Components</button>
+    <button class="secondary" data-action="generate-screens">Generate / Refresh Screens</button>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Maintenance</div>
+    <button class="danger" data-action="clear-generated">Clear Generated Design</button>
+  </div>
+
+  <div id="progress">Ready.</div>
+  <div class="footer">
+    Generated pages: 01 Foundations, 02 Components, 03 Screens.
+    Existing unrelated nodes are not removed.
+  </div>
+
+  <script>
+    const buttons = [...document.querySelectorAll("button")];
+    const progress = document.getElementById("progress");
+
+    function setBusy(value) {
+      buttons.forEach(button => button.disabled = value);
+    }
+
+    buttons.forEach(button => {
+      button.onclick = () => {
+        setBusy(true);
+        progress.textContent = "Starting…";
+        parent.postMessage({ pluginMessage: { type: button.dataset.action } }, "*");
+      };
+    });
+
+    onmessage = event => {
+      const message = event.data.pluginMessage;
+      if (!message) return;
+      if (message.type === "progress") {
+        progress.textContent = message.message;
+      }
+      if (message.type === "done") {
+        progress.textContent = message.message;
+        setBusy(false);
+      }
+      if (message.type === "error") {
+        progress.textContent = "Error: " + message.message;
+        setBusy(false);
+      }
+    };
+  </script>
+</body>
+</html>
