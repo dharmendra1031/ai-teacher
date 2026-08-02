@@ -112,7 +112,7 @@ Import-DotEnv -Path $envFile
 Stop-RecordedProcesses
 
 $livekitExecutable = [System.IO.Path]::GetFullPath((Join-Path $root 'infrastructure\bin\livekit-server.exe'))
-$livekitConfig = [System.IO.Path]::GetFullPath((Join-Path $root 'infrastructure\livekit.yaml'))
+$configScript = [System.IO.Path]::GetFullPath((Join-Path $root 'infrastructure\new_runtime_config.ps1'))
 $tokenPython = [System.IO.Path]::GetFullPath((Join-Path $root 'token_service\.venv\Scripts\python.exe'))
 $tokenScript = [System.IO.Path]::GetFullPath((Join-Path $root 'token_service\server.py'))
 $participantPython = [System.IO.Path]::GetFullPath((Join-Path $root 'python_participant\.venv\Scripts\python.exe'))
@@ -120,7 +120,7 @@ $participantScript = [System.IO.Path]::GetFullPath((Join-Path $root 'python_part
 
 foreach ($requiredPath in @(
     $livekitExecutable,
-    $livekitConfig,
+    $configScript,
     $tokenPython,
     $tokenScript,
     $participantPython,
@@ -131,9 +131,27 @@ foreach ($requiredPath in @(
     }
 }
 
-$quotedLivekitConfig = '"'.Replace('\', '') + $livekitConfig + '"'.Replace('\', '')
-$quotedTokenScript = '"'.Replace('\', '') + $tokenScript + '"'.Replace('\', '')
-$quotedParticipantScript = '"'.Replace('\', '') + $participantScript + '"'.Replace('\', '')
+$livekitConfig = & $configScript `
+    -EnvFile $envFile `
+    -OutputPath (Join-Path $runtimeDirectory 'livekit.generated.yaml')
+$livekitConfig = [System.IO.Path]::GetFullPath([string]$livekitConfig)
+
+# Start every run with fresh evidence. Old logs must never produce a false PASS.
+foreach ($logName in @(
+    'livekit.out.log',
+    'livekit.err.log',
+    'token-service.out.log',
+    'token-service.err.log',
+    'python-participant.out.log',
+    'python-participant.err.log'
+)) {
+    Remove-Item (Join-Path $runtimeDirectory $logName) -Force -ErrorAction SilentlyContinue
+}
+
+$quote = [char]34
+$quotedLivekitConfig = "$quote$livekitConfig$quote"
+$quotedTokenScript = "$quote$tokenScript$quote"
+$quotedParticipantScript = "$quote$participantScript$quote"
 $processRecords = @()
 
 try {
