@@ -39,6 +39,16 @@ function Set-EnvironmentValue {
     return $Content.TrimEnd() + "`r`n$Name=$Value`r`n"
 }
 
+function Write-Utf8WithoutBom {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Content
+    )
+
+    $encoding = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($Path, $Content, $encoding)
+}
+
 Write-Host 'AI Teacher Phase 1 — Windows setup without Docker' -ForegroundColor Cyan
 Write-Host ''
 
@@ -57,7 +67,7 @@ if (Test-Path $envPath) {
     $content = Set-EnvironmentValue -Content $content -Name 'LIVEKIT_NODE_IP' -Value $lanIp
     $content = Set-EnvironmentValue -Content $content -Name 'LIVEKIT_PUBLIC_URL' -Value "ws://$lanIp`:7880"
     $content = Set-EnvironmentValue -Content $content -Name 'TOKEN_SERVICE_PUBLIC_URL' -Value "http://$lanIp`:8090"
-    Set-Content -Path $envPath -Value $content -Encoding UTF8
+    Write-Utf8WithoutBom -Path $envPath -Content $content
 
     Write-Host ''
     Write-Host "Refreshed LAN URLs in .env with IP $lanIp" -ForegroundColor Green
@@ -65,7 +75,7 @@ if (Test-Path $envPath) {
 } else {
     $content = Get-Content $envExamplePath -Raw
     $content = $content.Replace('192.168.1.20', $lanIp)
-    Set-Content -Path $envPath -Value $content -Encoding UTF8
+    Write-Utf8WithoutBom -Path $envPath -Content $content
 
     Write-Host ''
     Write-Host "Created .env with LAN IP $lanIp" -ForegroundColor Green
