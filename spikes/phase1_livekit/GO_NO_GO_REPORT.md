@@ -14,7 +14,7 @@
 
 | Component | Expected | Tested |
 |---|---:|---:|
-| LiveKit Server | 1.13.1 | |
+| Native LiveKit Server | 1.13.1 | |
 | LiveKit Flutter SDK | 2.8.1 | |
 | LiveKit Python RTC | 1.1.13 | |
 | LiveKit Python API | 1.2.0 | |
@@ -39,6 +39,7 @@
 | App foreground/background tested | NOT TESTED | |
 | Clean leave leaves no ghost participant | NOT TESTED | |
 | Python shutdown leaves no worker process | NOT TESTED | |
+| Native LiveKit process stops cleanly | NOT TESTED | |
 
 ## Network matrix
 
@@ -94,7 +95,7 @@ Record at least 20 successful/failed attempts.
 | Component | CPU | RAM | Battery / thermal | Notes |
 |---|---:|---:|---|---|
 | Android phone | | | | |
-| LiveKit container | | | N/A | |
+| Native LiveKit process | | | N/A | |
 | Python participant | | | N/A | |
 
 ## TURN / TLS findings
