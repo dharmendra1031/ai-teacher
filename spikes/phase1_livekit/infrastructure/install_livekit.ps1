@@ -14,7 +14,7 @@ $binDirectory = Join-Path $PSScriptRoot 'bin'
 $executablePath = Join-Path $binDirectory 'livekit-server.exe'
 
 if ((Test-Path $executablePath) -and -not $Force) {
-    Write-Host "LiveKit Server is already installed at:" -ForegroundColor Green
+    Write-Host 'LiveKit Server is already installed at:' -ForegroundColor Green
     Write-Host $executablePath
     & $executablePath --version
     exit 0
@@ -56,11 +56,7 @@ try {
 
     Expand-Archive -Path $archivePath -DestinationPath $extractDirectory -Force
 
-    $downloadedExecutable = Get-ChildItem \
-        -Path $extractDirectory \
-        -Filter 'livekit-server.exe' \
-        -File \
-        -Recurse |
+    $downloadedExecutable = Get-ChildItem -Path $extractDirectory -Filter 'livekit-server.exe' -File -Recurse |
         Select-Object -First 1
 
     if (-not $downloadedExecutable) {
