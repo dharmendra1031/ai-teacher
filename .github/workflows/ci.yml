@@ -15,7 +15,7 @@ jobs:
       run:
         working-directory: mobile_app
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: 3.44.0
@@ -35,8 +35,8 @@ jobs:
       run:
         working-directory: ${{ matrix.service }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12.13'
           cache: pip
@@ -67,8 +67,8 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12.13'
       - name: Verify PostgreSQL service
@@ -85,25 +85,37 @@ jobs:
             drf: pending-phase-3
             jwt: pending-phase-3
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Preserve mandatory auth gate
         run: echo "Django ${{ matrix.django }}, DRF ${{ matrix.drf }}, JWT ${{ matrix.jwt }}"
 
   containers:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Validate Compose model
         run: docker compose --env-file .env.example -f infrastructure/compose.yaml config --quiet
       - name: Build CPU-only service images
         run: |
           docker build -t ai-teacher-backend:ci backend
           docker build -t ai-teacher-realtime-agent:ci realtime_agent
+      - name: Start and verify non-GPU Compose stack
+        run: |
+          set -euo pipefail
+          cleanup() {
+            docker compose --env-file .env.example -f infrastructure/compose.yaml logs --no-color || true
+            docker compose --env-file .env.example -f infrastructure/compose.yaml down --volumes --remove-orphans
+          }
+          trap cleanup EXIT
+          docker compose --env-file .env.example -f infrastructure/compose.yaml up --build --detach --wait --wait-timeout 180
+          curl --fail --silent --show-error http://127.0.0.1:8000/health/live
+          curl --fail --silent --show-error http://127.0.0.1:8000/health/ready
+          curl --fail --silent --show-error http://127.0.0.1:7880/
 
   security-and-supply-chain:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Secret scan
