@@ -58,6 +58,35 @@ function Wait-TcpPort {
     throw "Timed out waiting for $HostName`:$Port."
 }
 
+function Get-MatchingRecordedProcess {
+    param([Parameter(Mandatory = $true)]$Record)
+
+    $cimProcess = Get-CimInstance Win32_Process -Filter "ProcessId = $($Record.pid)" -ErrorAction SilentlyContinue
+    if (-not $cimProcess) {
+        return $null
+    }
+
+    if (-not $Record.executablePath -or -not $cimProcess.ExecutablePath) {
+        return $null
+    }
+
+    $expectedPath = [System.IO.Path]::GetFullPath([string]$Record.executablePath)
+    $actualPath = [System.IO.Path]::GetFullPath([string]$cimProcess.ExecutablePath)
+    if ($actualPath -ine $expectedPath) {
+        return $null
+    }
+
+    $marker = [string]$Record.commandMarker
+    if ($marker) {
+        $commandLine = [string]$cimProcess.CommandLine
+        if ($commandLine.IndexOf($marker, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+            return $null
+        }
+    }
+
+    return $cimProcess
+}
+
 function Stop-RecordedProcesses {
     if (-not (Test-Path $processFile)) {
         return
@@ -66,9 +95,11 @@ function Stop-RecordedProcesses {
     try {
         $records = Get-Content $processFile -Raw | ConvertFrom-Json
         foreach ($record in @($records)) {
-            $process = Get-Process -Id $record.pid -ErrorAction SilentlyContinue
+            $process = Get-MatchingRecordedProcess -Record $record
             if ($process) {
                 Stop-Process -Id $record.pid -Force -ErrorAction SilentlyContinue
+            } else {
+                Write-Host "Skipped stale or mismatched PID $($record.pid) ($($record.name))." -ForegroundColor Yellow
             }
         }
     } finally {
@@ -80,12 +111,21 @@ New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
 Import-DotEnv -Path $envFile
 Stop-RecordedProcesses
 
-$livekitExecutable = Join-Path $root 'infrastructure\bin\livekit-server.exe'
-$livekitConfig = Join-Path $root 'infrastructure\livekit.yaml'
-$tokenPython = Join-Path $root 'token_service\.venv\Scripts\python.exe'
-$participantPython = Join-Path $root 'python_participant\.venv\Scripts\python.exe'
+$livekitExecutable = [System.IO.Path]::GetFullPath((Join-Path $root 'infrastructure\bin\livekit-server.exe'))
+$livekitConfig = [System.IO.Path]::GetFullPath((Join-Path $root 'infrastructure\livekit.yaml'))
+$tokenPython = [System.IO.Path]::GetFullPath((Join-Path $root 'token_service\.venv\Scripts\python.exe'))
+$tokenScript = [System.IO.Path]::GetFullPath((Join-Path $root 'token_service\server.py'))
+$participantPython = [System.IO.Path]::GetFullPath((Join-Path $root 'python_participant\.venv\Scripts\python.exe'))
+$participantScript = [System.IO.Path]::GetFullPath((Join-Path $root 'python_participant\participant.py'))
 
-foreach ($requiredPath in @($livekitExecutable, $livekitConfig, $tokenPython, $participantPython)) {
+foreach ($requiredPath in @(
+    $livekitExecutable,
+    $livekitConfig,
+    $tokenPython,
+    $tokenScript,
+    $participantPython,
+    $participantScript
+)) {
     if (-not (Test-Path $requiredPath)) {
         throw "Missing required file: $requiredPath. Run .\setup_phase1.ps1 first."
     }
@@ -96,28 +136,38 @@ $processRecords = @()
 try {
     Write-Host 'Starting native LiveKit Server...' -ForegroundColor Cyan
     $livekitStart = @{
-        FilePath               = $livekitExecutable
-        ArgumentList           = @('--config', 'infrastructure\livekit.yaml', '--node-ip', $env:LIVEKIT_NODE_IP)
-        WorkingDirectory       = $root
+        FilePath                = $livekitExecutable
+        ArgumentList            = @('--config', $livekitConfig, '--bind', '0.0.0.0', '--node-ip', $env:LIVEKIT_NODE_IP)
+        WorkingDirectory        = $root
         RedirectStandardOutput = (Join-Path $runtimeDirectory 'livekit.out.log')
         RedirectStandardError  = (Join-Path $runtimeDirectory 'livekit.err.log')
-        PassThru               = $true
+        PassThru                = $true
     }
     $livekitProcess = Start-Process @livekitStart
-    $processRecords += [pscustomobject]@{ name = 'livekit'; pid = $livekitProcess.Id }
+    $processRecords += [pscustomobject]@{
+        name = 'livekit'
+        pid = $livekitProcess.Id
+        executablePath = $livekitExecutable
+        commandMarker = $livekitConfig
+    }
     Wait-TcpPort -HostName '127.0.0.1' -Port 7880
 
     Write-Host 'Starting development token service...' -ForegroundColor Cyan
     $tokenStart = @{
-        FilePath               = $tokenPython
-        ArgumentList           = @('token_service\server.py')
-        WorkingDirectory       = $root
+        FilePath                = $tokenPython
+        ArgumentList            = @($tokenScript)
+        WorkingDirectory        = $root
         RedirectStandardOutput = (Join-Path $runtimeDirectory 'token-service.out.log')
         RedirectStandardError  = (Join-Path $runtimeDirectory 'token-service.err.log')
-        PassThru               = $true
+        PassThru                = $true
     }
     $tokenProcess = Start-Process @tokenStart
-    $processRecords += [pscustomobject]@{ name = 'token-service'; pid = $tokenProcess.Id }
+    $processRecords += [pscustomobject]@{
+        name = 'token-service'
+        pid = $tokenProcess.Id
+        executablePath = $tokenPython
+        commandMarker = $tokenScript
+    }
     Wait-TcpPort -HostName '127.0.0.1' -Port 8090
 
     $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8090/health' -TimeoutSec 5
@@ -127,21 +177,26 @@ try {
 
     Write-Host 'Starting Python test participant...' -ForegroundColor Cyan
     $participantStart = @{
-        FilePath               = $participantPython
-        ArgumentList           = @('python_participant\participant.py')
-        WorkingDirectory       = $root
+        FilePath                = $participantPython
+        ArgumentList            = @($participantScript)
+        WorkingDirectory        = $root
         RedirectStandardOutput = (Join-Path $runtimeDirectory 'python-participant.out.log')
         RedirectStandardError  = (Join-Path $runtimeDirectory 'python-participant.err.log')
-        PassThru               = $true
+        PassThru                = $true
     }
     $participantProcess = Start-Process @participantStart
-    $processRecords += [pscustomobject]@{ name = 'python-participant'; pid = $participantProcess.Id }
+    $processRecords += [pscustomobject]@{
+        name = 'python-participant'
+        pid = $participantProcess.Id
+        executablePath = $participantPython
+        commandMarker = $participantScript
+    }
 
-    $processRecords | ConvertTo-Json | Set-Content -Path $processFile -Encoding UTF8
-    Start-Sleep -Seconds 2
+    $processRecords | ConvertTo-Json -Depth 3 | Set-Content -Path $processFile -Encoding UTF8
+    Start-Sleep -Seconds 3
 
     foreach ($record in $processRecords) {
-        if (-not (Get-Process -Id $record.pid -ErrorAction SilentlyContinue)) {
+        if (-not (Get-MatchingRecordedProcess -Record $record)) {
             throw "$($record.name) stopped immediately. Check .runtime log files."
         }
     }
@@ -164,7 +219,7 @@ try {
     }
 } catch {
     if ($processRecords.Count -gt 0) {
-        $processRecords | ConvertTo-Json | Set-Content -Path $processFile -Encoding UTF8
+        $processRecords | ConvertTo-Json -Depth 3 | Set-Content -Path $processFile -Encoding UTF8
     }
     & (Join-Path $root 'stop_phase1.ps1')
     throw
