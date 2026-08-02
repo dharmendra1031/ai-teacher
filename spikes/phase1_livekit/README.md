@@ -1,8 +1,14 @@
 # Phase 1 — Flutter ↔ LiveKit ↔ Python Feasibility Spike
 
-This directory implements the risky realtime transport proof required by `DEVELOPMENT_ROADMAP.md` before Phase 2 begins.
+This directory proves the riskiest realtime media connection before Phase 2 begins.
 
-This is deliberately isolated from the production app. It must prove media transport on a **physical Android device** before backend, complete UI or avatar expansion continues.
+The spike is isolated from the production app. It must work on a **physical Android device** before backend, complete UI or avatar expansion continues.
+
+## Docker status
+
+**Docker is not required for Phase 1.**
+
+LiveKit Server runs directly as a native Windows executable. The setup script downloads the pinned official Windows release, verifies its SHA-256 checksum and stores it in the ignored `infrastructure/bin` folder.
 
 ## Pinned spike versions
 
@@ -17,16 +23,18 @@ This is deliberately isolated from the production app. It must prove media trans
 | permission_handler | `12.0.3` |
 | python-dotenv | `1.2.2` |
 
-The Flutter SDK is intentionally pinned to 2.8.1 for this spike rather than immediately adopting a newly published release without compatibility testing.
-
 ## Directory layout
 
 ```text
 phase1_livekit/
 ├── .env.example
 ├── infrastructure/
-│   ├── docker-compose.yml
-│   └── livekit.yaml
+│   ├── install_livekit.ps1
+│   ├── setup_windows.ps1
+│   ├── start_livekit.ps1
+│   ├── stop_livekit.ps1
+│   ├── livekit.yaml
+│   └── bin/                    # generated locally; not committed
 ├── token_service/
 │   ├── requirements.txt
 │   └── server.py
@@ -37,52 +45,85 @@ phase1_livekit/
 │   ├── lib/
 │   ├── pubspec.yaml
 │   └── tool/bootstrap_android.ps1
+├── validate.ps1
 └── GO_NO_GO_REPORT.md
 ```
 
 ## Prerequisites
 
-- Windows laptop with Docker Desktop.
+- Windows laptop.
+- PowerShell.
+- Internet connection for the one-time LiveKit download.
 - Python 3.12.
 - Flutter stable and Android toolchain.
 - Physical Android phone with USB debugging.
 - Laptop and phone on the same Wi-Fi for the first test.
 - Headphones for echo-free audio verification.
 
-## 1. Create the local environment file
+## 1. One-time Windows setup
+
+Open **PowerShell as Administrator**, then run:
+
+```powershell
+git checkout development
+git pull origin development
+cd spikes\phase1_livekit
+powershell -ExecutionPolicy Bypass -File .\infrastructure\setup_windows.ps1
+```
+
+The setup script:
+
+1. Downloads LiveKit Server `1.13.1` for Windows.
+2. Verifies the official SHA-256 checksum.
+3. Detects the laptop LAN IPv4 address.
+4. Creates `.env` without committing secrets.
+5. Adds the required local Windows Firewall rules.
+
+Review `.env` after setup. It should look similar to:
+
+```env
+LIVEKIT_API_KEY=devkey
+LIVEKIT_API_SECRET=secret
+LIVEKIT_NODE_IP=192.168.1.20
+LIVEKIT_PUBLIC_URL=ws://192.168.1.20:7880
+TOKEN_SERVICE_PUBLIC_URL=http://192.168.1.20:8090
+ROOM_NAME=phase1-room
+PYTHON_PARTICIPANT_ID=python-test-participant
+TOKEN_SERVICE_HOST=0.0.0.0
+TOKEN_SERVICE_PORT=8090
+```
+
+The IP must match the laptop's active Wi-Fi IPv4 address shown by `ipconfig`.
+
+## 2. Validate source and tools
 
 From `spikes/phase1_livekit`:
 
 ```powershell
-Copy-Item .env.example .env
-ipconfig
+powershell -ExecutionPolicy Bypass -File .\validate.ps1
 ```
 
-Edit `.env` and replace every example LAN IP with the laptop's active IPv4 address, for example `192.168.1.20`.
+This checks:
 
-Do not commit `.env`.
+- Python syntax.
+- Native LiveKit installation and version.
+- Required `.env` fields.
+- Flutter dependency resolution.
+- Flutter analysis and tests.
 
-## 2. Open Windows firewall ports
+It does not replace the physical-device media test.
 
-Run PowerShell as Administrator:
+## 3. Start native LiveKit
+
+Open Terminal 1 in `spikes/phase1_livekit`:
 
 ```powershell
-New-NetFirewallRule -DisplayName "AI Teacher LiveKit Signaling" -Direction Inbound -Protocol TCP -LocalPort 7880,7881,8090 -Action Allow
-New-NetFirewallRule -DisplayName "AI Teacher LiveKit Media" -Direction Inbound -Protocol UDP -LocalPort 50000-50020 -Action Allow
+powershell -ExecutionPolicy Bypass -File .\infrastructure\start_livekit.ps1
 ```
 
-These rules are for the local feasibility test only. Production will require TLS, TURN and a separately reviewed firewall policy.
+Keep this window open. LiveKit logs appear directly in the terminal.
 
-## 3. Start LiveKit
-
-From `spikes/phase1_livekit`:
-
-```powershell
-docker compose --env-file .env -f infrastructure/docker-compose.yml up -d
-docker logs -f ai-teacher-phase1-livekit
-```
-
-In another terminal:
+Check the ports in another window:
 
 ```powershell
 Test-NetConnection -ComputerName 127.0.0.1 -Port 7880
@@ -90,11 +131,9 @@ Test-NetConnection -ComputerName YOUR_LAPTOP_LAN_IP -Port 7880
 Test-NetConnection -ComputerName YOUR_LAPTOP_LAN_IP -Port 7881
 ```
 
-The container log must show a successful server start and the configured node IP.
-
 ## 4. Start the development token service
 
-From `spikes/phase1_livekit`:
+Open Terminal 2 in `spikes/phase1_livekit`:
 
 ```powershell
 py -3.12 -m venv token_service\.venv
@@ -114,7 +153,7 @@ The token service is development-only. The LiveKit API secret never goes into Fl
 
 ## 5. Start the Python test participant
 
-Open another terminal in `spikes/phase1_livekit`:
+Open Terminal 3 in `spikes/phase1_livekit`:
 
 ```powershell
 py -3.12 -m venv python_participant\.venv
@@ -135,7 +174,7 @@ Expected behavior:
 
 ## 6. Bootstrap and run the Flutter physical-device client
 
-From `spikes/phase1_livekit/flutter_client`:
+Open Terminal 4 in `spikes/phase1_livekit/flutter_client`:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tool\bootstrap_android.ps1
@@ -144,8 +183,6 @@ flutter test
 flutter devices
 flutter run --dart-define=TOKEN_SERVICE_URL=http://YOUR_LAPTOP_LAN_IP:8090
 ```
-
-The bootstrap script adds the local-spike Android permissions and enables cleartext HTTP/WebSocket access. This is not a production network-security configuration.
 
 On the phone:
 
@@ -173,7 +210,7 @@ Record each result in `GO_NO_GO_REPORT.md`:
 - Wired headset.
 - Bluetooth headset.
 
-The local Docker setup alone cannot prove mobile-data or restrictive-network success. Those tests will determine the TURN/TLS requirement for the next environment.
+The local Windows setup proves LAN transport only. External/restrictive tests determine the TURN/TLS requirement for the next environment.
 
 ## 8. Required measurements
 
@@ -183,22 +220,25 @@ Capture at least:
 - Reconnect attempts and success count.
 - Packet-loss/jitter observations from logs or diagnostics.
 - Phone CPU, RAM and battery observation.
+- Native LiveKit process CPU and RAM.
 - Python worker CPU and RAM.
 - Remaining participants/processes after leave.
 - Any audio-route failure.
 
 ## 9. Stop and reset
 
-Stop Flutter and Python with `Ctrl+C`, then:
+Stop Flutter, the token service and Python participant with `Ctrl+C`.
+
+If the LiveKit terminal is open, press `Ctrl+C` there too. To stop it from another terminal:
 
 ```powershell
-docker compose --env-file .env -f infrastructure/docker-compose.yml down
+powershell -ExecutionPolicy Bypass -File .\infrastructure\stop_livekit.ps1
 ```
 
-Confirm:
+Confirm the Phase 1 processes:
 
 ```powershell
-docker ps --filter name=ai-teacher-phase1-livekit
+Get-Process livekit-server -ErrorAction SilentlyContinue
 Get-Process python -ErrorAction SilentlyContinue
 ```
 
