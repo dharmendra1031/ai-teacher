@@ -131,9 +131,9 @@ foreach ($requiredPath in @(
     }
 }
 
-$quotedLivekitConfig = '"' + $livekitConfig + '"'
-$quotedTokenScript = '"' + $tokenScript + '"'
-$quotedParticipantScript = '"' + $participantScript + '"'
+$quotedLivekitConfig = '"'.Replace('\', '') + $livekitConfig + '"'.Replace('\', '')
+$quotedTokenScript = '"'.Replace('\', '') + $tokenScript + '"'.Replace('\', '')
+$quotedParticipantScript = '"'.Replace('\', '') + $participantScript + '"'.Replace('\', '')
 $processRecords = @()
 
 try {
@@ -212,7 +212,8 @@ try {
 
     if ($RunFlutter) {
         $flutterRoot = Join-Path $root 'flutter_client'
-        $flutterCommand = "Set-Location '$flutterRoot'; flutter run --dart-define=TOKEN_SERVICE_URL=$($env:TOKEN_SERVICE_PUBLIC_URL)"
+        $escapedFlutterRoot = $flutterRoot.Replace("'", "''")
+        $flutterCommand = "Set-Location '$escapedFlutterRoot'; flutter run --dart-define=TOKEN_SERVICE_URL=$($env:TOKEN_SERVICE_PUBLIC_URL)"
         Start-Process powershell.exe -ArgumentList @('-NoExit', '-ExecutionPolicy', 'Bypass', '-Command', $flutterCommand)
         Write-Host 'Flutter run window opened.' -ForegroundColor Green
     } else {
