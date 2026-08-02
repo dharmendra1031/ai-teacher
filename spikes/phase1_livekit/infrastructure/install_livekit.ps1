@@ -13,10 +13,17 @@ $checksumsUrl = "$releaseBaseUrl/checksums.txt"
 $binDirectory = Join-Path $PSScriptRoot 'bin'
 $executablePath = Join-Path $binDirectory 'livekit-server.exe'
 
+function Assert-LiveKitVersion {
+    & $executablePath --version
+    if ($LASTEXITCODE -ne 0) {
+        throw "LiveKit Server version check failed with exit code $LASTEXITCODE."
+    }
+}
+
 if ((Test-Path $executablePath) -and -not $Force) {
     Write-Host 'LiveKit Server is already installed at:' -ForegroundColor Green
     Write-Host $executablePath
-    & $executablePath --version
+    Assert-LiveKitVersion
     return
 }
 
@@ -33,6 +40,10 @@ try {
     Write-Host "Downloading LiveKit Server v$version for Windows..."
     Invoke-WebRequest -Uri $downloadUrl -OutFile $archivePath
     Invoke-WebRequest -Uri $checksumsUrl -OutFile $checksumsPath
+
+    if (-not (Test-Path $archivePath) -or (Get-Item $archivePath).Length -eq 0) {
+        throw 'The downloaded LiveKit archive is missing or empty.'
+    }
 
     $checksumLine = Get-Content $checksumsPath |
         Where-Object { $_ -match [regex]::Escape($assetName) } |
@@ -68,7 +79,7 @@ try {
     Write-Host ''
     Write-Host 'LiveKit Server installed successfully.' -ForegroundColor Green
     Write-Host $executablePath
-    & $executablePath --version
+    Assert-LiveKitVersion
 } finally {
     Remove-Item $tempDirectory -Recurse -Force -ErrorAction SilentlyContinue
 }
