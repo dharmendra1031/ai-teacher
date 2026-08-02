@@ -5,17 +5,11 @@ $envExamplePath = Join-Path $phaseRoot '.env.example'
 $envPath = Join-Path $phaseRoot '.env'
 
 function Get-LanIpv4Address {
-    $routes = Get-NetRoute \
-        -AddressFamily IPv4 \
-        -DestinationPrefix '0.0.0.0/0' \
-        -ErrorAction SilentlyContinue |
+    $routes = Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue |
         Sort-Object RouteMetric
 
     foreach ($route in $routes) {
-        $address = Get-NetIPAddress \
-            -AddressFamily IPv4 \
-            -InterfaceIndex $route.InterfaceIndex \
-            -ErrorAction SilentlyContinue |
+        $address = Get-NetIPAddress -AddressFamily IPv4 -InterfaceIndex $route.InterfaceIndex -ErrorAction SilentlyContinue |
             Where-Object {
                 $_.IPAddress -notlike '127.*' -and
                 $_.IPAddress -notlike '169.254.*'
@@ -62,21 +56,25 @@ $isAdministrator = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::
 
 if ($isAdministrator) {
     if (-not (Get-NetFirewallRule -DisplayName 'AI Teacher LiveKit Signaling' -ErrorAction SilentlyContinue)) {
-        New-NetFirewallRule \
-            -DisplayName 'AI Teacher LiveKit Signaling' \
-            -Direction Inbound \
-            -Protocol TCP \
-            -LocalPort 7880,7881,8090 \
-            -Action Allow | Out-Null
+        $signalingRule = @{
+            DisplayName = 'AI Teacher LiveKit Signaling'
+            Direction   = 'Inbound'
+            Protocol    = 'TCP'
+            LocalPort   = 7880, 7881, 8090
+            Action      = 'Allow'
+        }
+        New-NetFirewallRule @signalingRule | Out-Null
     }
 
     if (-not (Get-NetFirewallRule -DisplayName 'AI Teacher LiveKit Media' -ErrorAction SilentlyContinue)) {
-        New-NetFirewallRule \
-            -DisplayName 'AI Teacher LiveKit Media' \
-            -Direction Inbound \
-            -Protocol UDP \
-            -LocalPort 50000-50020 \
-            -Action Allow | Out-Null
+        $mediaRule = @{
+            DisplayName = 'AI Teacher LiveKit Media'
+            Direction   = 'Inbound'
+            Protocol    = 'UDP'
+            LocalPort   = '50000-50020'
+            Action      = 'Allow'
+        }
+        New-NetFirewallRule @mediaRule | Out-Null
     }
 
     Write-Host 'Windows Firewall rules are ready.' -ForegroundColor Green
