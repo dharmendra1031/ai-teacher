@@ -131,13 +131,16 @@ foreach ($requiredPath in @(
     }
 }
 
+$quotedLivekitConfig = '"' + $livekitConfig + '"'
+$quotedTokenScript = '"' + $tokenScript + '"'
+$quotedParticipantScript = '"' + $participantScript + '"'
 $processRecords = @()
 
 try {
     Write-Host 'Starting native LiveKit Server...' -ForegroundColor Cyan
     $livekitStart = @{
         FilePath                = $livekitExecutable
-        ArgumentList            = @('--config', $livekitConfig, '--bind', '0.0.0.0', '--node-ip', $env:LIVEKIT_NODE_IP)
+        ArgumentList            = @('--config', $quotedLivekitConfig, '--bind', '0.0.0.0', '--node-ip', $env:LIVEKIT_NODE_IP)
         WorkingDirectory        = $root
         RedirectStandardOutput = (Join-Path $runtimeDirectory 'livekit.out.log')
         RedirectStandardError  = (Join-Path $runtimeDirectory 'livekit.err.log')
@@ -155,7 +158,7 @@ try {
     Write-Host 'Starting development token service...' -ForegroundColor Cyan
     $tokenStart = @{
         FilePath                = $tokenPython
-        ArgumentList            = @($tokenScript)
+        ArgumentList            = @($quotedTokenScript)
         WorkingDirectory        = $root
         RedirectStandardOutput = (Join-Path $runtimeDirectory 'token-service.out.log')
         RedirectStandardError  = (Join-Path $runtimeDirectory 'token-service.err.log')
@@ -178,7 +181,7 @@ try {
     Write-Host 'Starting Python test participant...' -ForegroundColor Cyan
     $participantStart = @{
         FilePath                = $participantPython
-        ArgumentList            = @($participantScript)
+        ArgumentList            = @($quotedParticipantScript)
         WorkingDirectory        = $root
         RedirectStandardOutput = (Join-Path $runtimeDirectory 'python-participant.out.log')
         RedirectStandardError  = (Join-Path $runtimeDirectory 'python-participant.err.log')
