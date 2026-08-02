@@ -80,6 +80,7 @@ Write-Check 'LiveKit signaling port 7880 reachable' $livekitPort
 Write-Check 'Token service port 8090 reachable' $tokenPort
 
 $healthPassed = $false
+$tokenGenerationPassed = $false
 if ($tokenPort) {
     try {
         $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8090/health' -TimeoutSec 5
@@ -87,8 +88,24 @@ if ($tokenPort) {
     } catch {
         $healthPassed = $false
     }
+
+    if ($healthPassed) {
+        try {
+            $smokeIdentity = 'phase1-check-' + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+            $tokenUri = 'http://127.0.0.1:8090/token?room=phase1-room&identity=' + [Uri]::EscapeDataString($smokeIdentity) + '&name=Phase1%20Checker'
+            $tokenResponse = Invoke-RestMethod -Uri $tokenUri -TimeoutSec 5
+            $tokenGenerationPassed =
+                [bool]$tokenResponse.token -and
+                [bool]$tokenResponse.url -and
+                $tokenResponse.room -eq 'phase1-room' -and
+                $tokenResponse.identity -eq $smokeIdentity
+        } catch {
+            $tokenGenerationPassed = $false
+        }
+    }
 }
 Write-Check 'Token service health endpoint returns status=ok' $healthPassed
+Write-Check 'Token service generates a complete development credential' $tokenGenerationPassed
 
 $recordedProcessesAlive = $false
 if (Test-Path $processFile) {
@@ -127,7 +144,7 @@ Write-Check 'Physical Flutter participant joined the room' $flutterParticipantSe
 Write-Check 'Python participant received phone microphone frames' $receivedPhoneAudio
 
 Write-Host ''
-if ($livekitPort -and $healthPassed -and $recordedProcessesAlive -and $publishedAudio -and $publishedVideo -and $flutterParticipantSeen -and $receivedPhoneAudio) {
+if ($livekitPort -and $healthPassed -and $tokenGenerationPassed -and $recordedProcessesAlive -and $publishedAudio -and $publishedVideo -and $flutterParticipantSeen -and $receivedPhoneAudio) {
     Write-Host 'Core same-Wi-Fi transport evidence is present.' -ForegroundColor Green
     Write-Host 'Manual checks still required: remote video visible, test tone audible, controls, reconnect and clean leave.'
 } else {
