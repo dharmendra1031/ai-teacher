@@ -36,8 +36,43 @@ function Import-DotEnvValues {
     return $values
 }
 
+function Assert-FirewallRule {
+    param(
+        [Parameter(Mandatory = $true)][string]$DisplayName,
+        [Parameter(Mandatory = $true)][string]$Protocol,
+        [Parameter(Mandatory = $true)][string[]]$ExpectedPorts
+    )
+
+    $rules = @(Get-NetFirewallRule -DisplayName $DisplayName -ErrorAction SilentlyContinue)
+    if ($rules.Count -ne 1) {
+        throw "Expected exactly one enabled firewall rule named '$DisplayName', found $($rules.Count). Re-run setup as Administrator."
+    }
+
+    $rule = $rules[0]
+    if ([string]$rule.Enabled -ne 'True' -or [string]$rule.Direction -ne 'Inbound' -or [string]$rule.Action -ne 'Allow') {
+        throw "Firewall rule '$DisplayName' must be enabled, inbound and allow traffic."
+    }
+
+    $filters = @($rule | Get-NetFirewallPortFilter)
+    if ($filters.Count -eq 0) {
+        throw "Firewall rule '$DisplayName' has no port filter."
+    }
+
+    $filterProtocol = [string]$filters[0].Protocol
+    if ($filterProtocol -ne $Protocol) {
+        throw "Firewall rule '$DisplayName' must use $Protocol, found $filterProtocol."
+    }
+
+    $portText = (@($filters | ForEach-Object { $_.LocalPort }) -join ',')
+    foreach ($expectedPort in $ExpectedPorts) {
+        if ($portText -notmatch ('(^|,)' + [regex]::Escape($expectedPort) + '(,|$)')) {
+            throw "Firewall rule '$DisplayName' is missing local port $expectedPort. Found: $portText"
+        }
+    }
+}
+
 try {
-    Write-Host '1/8 PowerShell syntax checks'
+    Write-Host '1/9 PowerShell syntax checks'
     $parseFailures = @()
     $excludedPattern = '\\(\.venv|\.dart_tool|build|android|\.runtime|bin)\\'
     Get-ChildItem -Path $root -Filter '*.ps1' -File -Recurse |
@@ -61,7 +96,7 @@ try {
         throw "PowerShell syntax validation failed with $($parseFailures.Count) error(s)."
     }
 
-    Write-Host '2/8 Python 3.12 and source syntax checks'
+    Write-Host '2/9 Python 3.12 and source syntax checks'
     if (-not (Get-Command py -ErrorAction SilentlyContinue)) {
         throw "Python launcher 'py' was not found in PATH."
     }
@@ -72,7 +107,7 @@ try {
     py -3.12 -m py_compile python_participant\participant.py
     Assert-LastExitCode -Operation 'Python-participant syntax check'
 
-    Write-Host '3/8 Python virtual-environment dependency and SDK checks'
+    Write-Host '3/9 Python virtual-environment dependency and SDK checks'
     $tokenPython = Join-Path $root 'token_service\.venv\Scripts\python.exe'
     $participantPython = Join-Path $root 'python_participant\.venv\Scripts\python.exe'
     foreach ($pythonPath in @($tokenPython, $participantPython)) {
@@ -86,7 +121,7 @@ try {
     & $participantPython -c "from importlib.metadata import version; from livekit import api, rtc; assert version('livekit') == '1.1.13'; assert version('livekit-api') == '1.2.0'; assert hasattr(rtc, 'AudioSource') and hasattr(rtc, 'VideoSource') and hasattr(rtc, 'Room'); print('participant SDK ok')"
     Assert-LastExitCode -Operation 'Python-participant LiveKit SDK check'
 
-    Write-Host '4/8 Native LiveKit and environment checks'
+    Write-Host '4/9 Native LiveKit and environment checks'
     if (-not (Test-Path .env)) {
         throw 'Missing .env. Run .\setup_phase1.ps1 first.'
     }
@@ -107,6 +142,8 @@ try {
         'LIVEKIT_PUBLIC_URL',
         'TOKEN_SERVICE_PUBLIC_URL',
         'ROOM_NAME',
+        'PYTHON_PARTICIPANT_ID',
+        'TOKEN_SERVICE_HOST',
         'TOKEN_SERVICE_PORT'
     )) {
         if (-not $envValues.ContainsKey($requiredName) -or -not $envValues[$requiredName]) {
@@ -123,6 +160,13 @@ try {
         throw "LIVEKIT_NODE_IP is not usable by a physical phone: $nodeIp"
     }
 
+    $assignedAddress = Get-NetIPAddress -AddressFamily IPv4 -IPAddress $nodeIp -ErrorAction SilentlyContinue |
+        Where-Object { -not $_.SkipAsSource } |
+        Select-Object -First 1
+    if (-not $assignedAddress) {
+        throw "LIVEKIT_NODE_IP $nodeIp is not assigned to an active local interface. Re-run setup or use -LanIp."
+    }
+
     try {
         $liveKitUri = [Uri]$envValues['LIVEKIT_PUBLIC_URL']
         $tokenUri = [Uri]$envValues['TOKEN_SERVICE_PUBLIC_URL']
@@ -136,11 +180,18 @@ try {
     if (-not $tokenUri.IsAbsoluteUri -or $tokenUri.Scheme -notin @('http', 'https') -or $tokenUri.Host -ne $nodeIp -or $tokenUri.Port -ne 8090) {
         throw 'TOKEN_SERVICE_PUBLIC_URL must use LIVEKIT_NODE_IP and port 8090.'
     }
+    if ([string]$envValues['TOKEN_SERVICE_HOST'] -ne '0.0.0.0') {
+        throw 'TOKEN_SERVICE_HOST must be 0.0.0.0 for physical-phone LAN access.'
+    }
     if ([string]$envValues['TOKEN_SERVICE_PORT'] -ne '8090') {
         throw 'TOKEN_SERVICE_PORT must be 8090 for this Phase 1 spike.'
     }
 
-    Write-Host '5/8 Generated LiveKit credential synchronization check'
+    Write-Host '5/9 Windows Firewall rule checks'
+    Assert-FirewallRule -DisplayName 'AI Teacher LiveKit Signaling' -Protocol 'TCP' -ExpectedPorts @('7880', '7881', '8090')
+    Assert-FirewallRule -DisplayName 'AI Teacher LiveKit Media' -Protocol 'UDP' -ExpectedPorts @('50000-50020')
+
+    Write-Host '6/9 Generated LiveKit credential synchronization check'
     New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
     $validationConfigPath = Join-Path $runtimeDirectory 'validate-livekit.generated.yaml'
     $generatedConfigPath = & $runtimeConfigScript -EnvFile (Join-Path $root '.env') -OutputPath $validationConfigPath
@@ -158,7 +209,7 @@ try {
     }
     Remove-Item $validationConfigPath -Force -ErrorAction SilentlyContinue
 
-    Write-Host '6/8 Flutter Android manifest and SDK constraint checks'
+    Write-Host '7/9 Flutter Android manifest and SDK constraint checks'
     $manifestPath = Join-Path $root 'flutter_client\android\app\src\main\AndroidManifest.xml'
     if (-not (Test-Path $manifestPath)) {
         throw 'Flutter Android wrapper is missing. Run .\setup_phase1.ps1 first.'
@@ -184,7 +235,7 @@ try {
         throw 'Flutter pubspec Dart SDK constraint must be >=3.8.0 for flutter_lints 6.0.0.'
     }
 
-    Write-Host '7/8 Flutter dependency resolution and analysis'
+    Write-Host '8/9 Flutter dependency resolution and analysis'
     Push-Location flutter_client
     try {
         flutter pub get
@@ -192,7 +243,7 @@ try {
         flutter analyze
         Assert-LastExitCode -Operation 'Flutter static analysis'
 
-        Write-Host '8/8 Flutter tests'
+        Write-Host '9/9 Flutter tests'
         flutter test
         Assert-LastExitCode -Operation 'Flutter tests'
     } finally {
