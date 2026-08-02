@@ -24,30 +24,51 @@ function Get-LanIpv4Address {
     return $null
 }
 
+function Set-EnvironmentValue {
+    param(
+        [Parameter(Mandatory = $true)][string]$Content,
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Value
+    )
+
+    $pattern = '(?m)^' + [regex]::Escape($Name) + '=.*$'
+    if ($Content -match $pattern) {
+        return [regex]::Replace($Content, $pattern, "$Name=$Value")
+    }
+
+    return $Content.TrimEnd() + "`r`n$Name=$Value`r`n"
+}
+
 Write-Host 'AI Teacher Phase 1 — Windows setup without Docker' -ForegroundColor Cyan
 Write-Host ''
 
 & (Join-Path $PSScriptRoot 'install_livekit.ps1')
 
-if (-not (Test-Path $envPath)) {
-    $lanIp = Get-LanIpv4Address
-    if (-not $lanIp) {
-        $lanIp = Read-Host 'Enter the laptop IPv4 address shown by ipconfig'
-    }
+$lanIp = Get-LanIpv4Address
+if (-not $lanIp) {
+    $lanIp = Read-Host 'Enter the laptop IPv4 address shown by ipconfig'
+}
+if (-not $lanIp) {
+    throw 'A LAN IPv4 address is required.'
+}
 
-    if (-not $lanIp) {
-        throw 'A LAN IPv4 address is required.'
-    }
+if (Test-Path $envPath) {
+    $content = Get-Content $envPath -Raw
+    $content = Set-EnvironmentValue -Content $content -Name 'LIVEKIT_NODE_IP' -Value $lanIp
+    $content = Set-EnvironmentValue -Content $content -Name 'LIVEKIT_PUBLIC_URL' -Value "ws://$lanIp`:7880"
+    $content = Set-EnvironmentValue -Content $content -Name 'TOKEN_SERVICE_PUBLIC_URL' -Value "http://$lanIp`:8090"
+    Set-Content -Path $envPath -Value $content -Encoding UTF8
 
+    Write-Host ''
+    Write-Host "Refreshed LAN URLs in .env with IP $lanIp" -ForegroundColor Green
+    Write-Host 'API key, secret and other settings were preserved.'
+} else {
     $content = Get-Content $envExamplePath -Raw
     $content = $content.Replace('192.168.1.20', $lanIp)
     Set-Content -Path $envPath -Value $content -Encoding UTF8
 
     Write-Host ''
     Write-Host "Created .env with LAN IP $lanIp" -ForegroundColor Green
-} else {
-    Write-Host ''
-    Write-Host '.env already exists; it was not overwritten.' -ForegroundColor Yellow
 }
 
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -86,5 +107,6 @@ if ($isAdministrator) {
 
 Write-Host ''
 Write-Host 'Setup complete.' -ForegroundColor Green
-Write-Host 'Start LiveKit with:'
-Write-Host 'powershell -ExecutionPolicy Bypass -File .\infrastructure\start_livekit.ps1'
+Write-Host "Detected LAN IP: $lanIp"
+Write-Host 'Confirm this matches the active Wi-Fi IPv4 shown by ipconfig.'
+Write-Host 'Next: powershell -ExecutionPolicy Bypass -File .\validate.ps1'
