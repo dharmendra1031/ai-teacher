@@ -30,17 +30,26 @@ function Import-DotEnv {
 
 Import-DotEnv -Path $EnvFile
 
+$phaseRoot = Split-Path -Parent $PSScriptRoot
+$runtimeDirectory = Join-Path $phaseRoot '.runtime'
 $executablePath = Join-Path $PSScriptRoot 'bin\livekit-server.exe'
-$configPath = Join-Path $PSScriptRoot 'livekit.yaml'
+$configScript = Join-Path $PSScriptRoot 'new_runtime_config.ps1'
 $nodeIp = $env:LIVEKIT_NODE_IP
 
 if (-not (Test-Path $executablePath)) {
     throw 'LiveKit Server is not installed. Run .\infrastructure\setup_windows.ps1 first.'
 }
-
+if (-not (Test-Path $configScript)) {
+    throw 'Runtime configuration generator is missing.'
+}
 if (-not $nodeIp) {
     throw 'LIVEKIT_NODE_IP is missing from .env.'
 }
+
+$configPath = & $configScript `
+    -EnvFile $EnvFile `
+    -OutputPath (Join-Path $runtimeDirectory 'livekit.generated.yaml')
+$configPath = [System.IO.Path]::GetFullPath([string]$configPath)
 
 Write-Host ''
 Write-Host 'Starting native LiveKit Server — no Docker required.' -ForegroundColor Green
