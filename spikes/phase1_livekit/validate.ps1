@@ -17,13 +17,7 @@ try {
         ) | Out-Null
 
         foreach ($parseError in $errors) {
-            $parseFailures += (
-                '{0}:{1}:{2} {3}' -f
-                $_.FullName,
-                $parseError.Extent.StartLineNumber,
-                $parseError.Extent.StartColumnNumber,
-                $parseError.Message
-            )
+            $parseFailures += ('{0}:{1}:{2} {3}' -f $_.FullName, $parseError.Extent.StartLineNumber, $parseError.Extent.StartColumnNumber, $parseError.Message)
         }
     }
 
