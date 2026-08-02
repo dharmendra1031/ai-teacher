@@ -20,6 +20,31 @@ function Test-TcpPort {
     }
 }
 
+function Test-RecordedProcess {
+    param([Parameter(Mandatory = $true)]$Record)
+
+    $cimProcess = Get-CimInstance Win32_Process -Filter "ProcessId = $($Record.pid)" -ErrorAction SilentlyContinue
+    if (-not $cimProcess -or -not $Record.executablePath -or -not $cimProcess.ExecutablePath) {
+        return $false
+    }
+
+    $expectedPath = [System.IO.Path]::GetFullPath([string]$Record.executablePath)
+    $actualPath = [System.IO.Path]::GetFullPath([string]$cimProcess.ExecutablePath)
+    if ($actualPath -ine $expectedPath) {
+        return $false
+    }
+
+    $marker = [string]$Record.commandMarker
+    if ($marker) {
+        $commandLine = [string]$cimProcess.CommandLine
+        if ($commandLine.IndexOf($marker, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+            return $false
+        }
+    }
+
+    return $true
+}
+
 function Write-Check {
     param(
         [Parameter(Mandatory = $true)][string]$Label,
@@ -38,10 +63,8 @@ $livekitExe = Join-Path $root 'infrastructure\bin\livekit-server.exe'
 $tokenPython = Join-Path $root 'token_service\.venv\Scripts\python.exe'
 $participantPython = Join-Path $root 'python_participant\.venv\Scripts\python.exe'
 $flutterAndroid = Join-Path $root 'flutter_client\android'
-$participantLog = Join-Path $runtimeDirectory 'python-participant.err.log'
-if (-not (Test-Path $participantLog)) {
-    $participantLog = Join-Path $runtimeDirectory 'python-participant.out.log'
-}
+$participantErrorLog = Join-Path $runtimeDirectory 'python-participant.err.log'
+$participantOutputLog = Join-Path $runtimeDirectory 'python-participant.out.log'
 
 Write-Host 'AI Teacher Phase 1 status' -ForegroundColor Cyan
 Write-Host ''
@@ -70,10 +93,13 @@ Write-Check 'Token service health endpoint returns status=ok' $healthPassed
 $recordedProcessesAlive = $false
 if (Test-Path $processFile) {
     try {
-        $records = Get-Content $processFile -Raw | ConvertFrom-Json
-        $recordedProcessesAlive = @($records).Count -ge 3
-        foreach ($record in $records) {
-            if (-not (Get-Process -Id $record.pid -ErrorAction SilentlyContinue)) {
+        $records = @(Get-Content $processFile -Raw | ConvertFrom-Json)
+        $expectedNames = @('livekit', 'token-service', 'python-participant')
+        $recordedProcessesAlive = $records.Count -eq $expectedNames.Count
+
+        foreach ($expectedName in $expectedNames) {
+            $record = $records | Where-Object { $_.name -eq $expectedName } | Select-Object -First 1
+            if (-not $record -or -not (Test-RecordedProcess -Record $record)) {
                 $recordedProcessesAlive = $false
             }
         }
@@ -81,20 +107,19 @@ if (Test-Path $processFile) {
         $recordedProcessesAlive = $false
     }
 }
-Write-Check 'LiveKit, token service and Python participant processes alive' $recordedProcessesAlive
+Write-Check 'Verified LiveKit, token service and Python participant processes alive' $recordedProcessesAlive
 
-$publishedAudio = $false
-$publishedVideo = $false
-$receivedPhoneAudio = $false
-$flutterParticipantSeen = $false
-
-if (Test-Path $participantLog) {
-    $log = Get-Content $participantLog -Raw
-    $publishedAudio = $log -match 'Published generated test audio'
-    $publishedVideo = $log -match 'Published generated test video'
-    $receivedPhoneAudio = $log -match 'Received user audio'
-    $flutterParticipantSeen = $log -match 'Participant connected identity=flutter-'
+$log = ''
+foreach ($logPath in @($participantErrorLog, $participantOutputLog)) {
+    if (Test-Path $logPath) {
+        $log += "`n" + (Get-Content $logPath -Raw)
+    }
 }
+
+$publishedAudio = $log -match 'Published generated test audio'
+$publishedVideo = $log -match 'Published generated test video'
+$receivedPhoneAudio = $log -match 'Received user audio'
+$flutterParticipantSeen = $log -match 'Participant connected identity=flutter-'
 
 Write-Check 'Python participant published generated audio' $publishedAudio
 Write-Check 'Python participant published generated video' $publishedVideo
@@ -102,7 +127,7 @@ Write-Check 'Physical Flutter participant joined the room' $flutterParticipantSe
 Write-Check 'Python participant received phone microphone frames' $receivedPhoneAudio
 
 Write-Host ''
-if ($livekitPort -and $healthPassed -and $publishedAudio -and $publishedVideo -and $flutterParticipantSeen -and $receivedPhoneAudio) {
+if ($livekitPort -and $healthPassed -and $recordedProcessesAlive -and $publishedAudio -and $publishedVideo -and $flutterParticipantSeen -and $receivedPhoneAudio) {
     Write-Host 'Core same-Wi-Fi transport evidence is present.' -ForegroundColor Green
     Write-Host 'Manual checks still required: remote video visible, test tone audible, controls, reconnect and clean leave.'
 } else {
