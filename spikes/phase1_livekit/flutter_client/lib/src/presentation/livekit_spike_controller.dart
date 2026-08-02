@@ -198,7 +198,7 @@ class LiveKitSpikeController extends GetxController
       for (final LocalTrackPublication<LocalVideoTrack> publication
           in participant.videoTrackPublications) {
         final LocalVideoTrack? track = publication.track;
-        if (track != null) {
+        if (track != null && publication.source == TrackSource.camera) {
           cameraTrack = track;
           break;
         }
@@ -209,8 +209,7 @@ class LiveKitSpikeController extends GetxController
         return;
       }
 
-      final String? selectedId =
-          Hardware.instance.selectedVideoInput?.deviceId;
+      final String? selectedId = cameraTrack.currentOptions.deviceId;
       int currentIndex = cameras.indexWhere(
         (MediaDevice device) => device.deviceId == selectedId,
       );
@@ -219,7 +218,6 @@ class LiveKitSpikeController extends GetxController
       final MediaDevice nextCamera =
           cameras[(currentIndex + 1) % cameras.length];
       await cameraTrack.switchCamera(nextCamera.deviceId, fastSwitch: true);
-      Hardware.instance.selectedVideoInput = nextCamera;
       _log('Switched camera to ${nextCamera.label}');
     });
   }
@@ -362,7 +360,8 @@ class LiveKitSpikeController extends GetxController
   String _friendlyError(Object error) {
     final String message = error.toString();
     if (message.contains('SocketException') ||
-        message.contains('Connection refused')) {
+        message.contains('Connection refused') ||
+        message.contains('Cannot reach token service')) {
       return 'Cannot reach the token service or LiveKit server. Check LAN IP and firewall.';
     }
     if (message.startsWith('Bad state: ')) {
