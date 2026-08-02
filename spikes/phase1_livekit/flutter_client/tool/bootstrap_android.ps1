@@ -41,8 +41,8 @@ try {
             continue
         }
 
-        $androidName = [regex]::Escape($nameMatch.Groups[1].Value)
-        if ($manifest -notmatch "android:name=\"$androidName\"") {
+        $needle = 'android:name="' + $nameMatch.Groups[1].Value + '"'
+        if (-not $manifest.Contains($needle)) {
             $missingDeclarations += "    $declaration"
         }
     }
