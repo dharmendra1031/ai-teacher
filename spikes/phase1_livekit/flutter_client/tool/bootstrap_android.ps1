@@ -10,6 +10,16 @@ function Assert-LastExitCode {
     }
 }
 
+function Write-Utf8WithoutBom {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Content
+    )
+
+    $encoding = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($Path, $Content, $encoding)
+}
+
 Push-Location $projectRoot
 
 try {
@@ -63,11 +73,18 @@ try {
         $manifest = $manifest -replace '<application', "$declarationBlock    <application"
     }
 
-    if ($manifest -notmatch 'android:usesCleartextTraffic=') {
+    if ($manifest -match 'android:usesCleartextTraffic="[^"]*"') {
+        $manifest = [regex]::Replace(
+            $manifest,
+            'android:usesCleartextTraffic="[^"]*"',
+            'android:usesCleartextTraffic="true"',
+            1
+        )
+    } else {
         $manifest = $manifest -replace '<application', '<application android:usesCleartextTraffic="true"'
     }
 
-    Set-Content -Path $manifestPath -Value $manifest -Encoding UTF8
+    Write-Utf8WithoutBom -Path $manifestPath -Content $manifest
 
     flutter pub get
     Assert-LastExitCode -Operation 'Flutter dependency installation'
