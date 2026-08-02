@@ -68,20 +68,12 @@ Write-Host ''
 if ($SkipFlutter) {
     Write-Host '4/4 Flutter setup skipped by request.' -ForegroundColor Yellow
 } else {
-    Write-Host '4/4 Preparing Flutter physical-device client...'
+    Write-Host '4/4 Preparing or refreshing Flutter physical-device client...'
     $flutterRoot = Join-Path $root 'flutter_client'
-    $androidDirectory = Join-Path $flutterRoot 'android'
-    if (-not (Test-Path $androidDirectory)) {
-        & (Join-Path $flutterRoot 'tool\bootstrap_android.ps1')
-    } else {
-        Push-Location $flutterRoot
-        try {
-            flutter pub get
-            Assert-LastExitCode -Operation 'Flutter dependency installation'
-        } finally {
-            Pop-Location
-        }
-    }
+
+    # Always run the idempotent bootstrap so permission and manifest fixes are
+    # applied even when an older Android wrapper already exists locally.
+    & (Join-Path $flutterRoot 'tool\bootstrap_android.ps1')
 }
 
 Write-Host ''
