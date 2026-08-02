@@ -1,41 +1,43 @@
 # Phase 1 — Flutter ↔ LiveKit ↔ Python Feasibility Spike
 
-This directory contains the isolated realtime transport proof required before Phase 2.
+This isolated spike proves realtime media transport before Phase 2 begins.
 
 ## Current status
 
 - Implementation and Windows automation: **COMPLETE**
 - Docker dependency: **REMOVED**
+- Two-pass static bug audit: **COMPLETE**
 - Physical Android verification: **PENDING**
 - Final Phase 1 decision: **NOT YET GO**
 
-Phase 1 is not marked passed until the physical Android media, controls, reconnect and cleanup checks are recorded in `GO_NO_GO_REPORT.md`.
+Phase 1 is not passed until physical Android media, controls, reconnect and cleanup evidence is recorded in `GO_NO_GO_REPORT.md`.
 
-## What is included
+## Included files
 
 ```text
 phase1_livekit/
-├── setup_phase1.ps1          # one-time complete setup
-├── start_phase1.ps1          # starts all local services
-├── check_phase1.ps1          # automatic readiness/evidence checks
-├── stop_phase1.ps1           # stops recorded Phase 1 processes
-├── validate.ps1              # syntax, dependency and Flutter checks
+├── setup_phase1.ps1
+├── start_phase1.ps1
+├── check_phase1.ps1
+├── stop_phase1.ps1
+├── validate.ps1
+├── BUG_AUDIT.md
 ├── infrastructure/
 │   ├── install_livekit.ps1
 │   ├── setup_windows.ps1
+│   ├── new_runtime_config.ps1
 │   ├── start_livekit.ps1
 │   ├── stop_livekit.ps1
-│   ├── livekit.yaml
-│   └── bin/                  # generated locally; ignored by Git
+│   └── bin/                  # generated locally; ignored
 ├── token_service/
 ├── python_participant/
 ├── flutter_client/
 └── GO_NO_GO_REPORT.md
 ```
 
-Docker Desktop and Docker Compose are not required. LiveKit Server runs directly as a native Windows executable.
+Docker Desktop and Docker Compose are not required. LiveKit runs as a native Windows executable. Its runtime YAML is generated from the ignored `.env` file, so LiveKit and the token service always use the same API key and secret.
 
-## Pinned spike versions
+## Pinned versions
 
 | Component | Version |
 |---|---:|
@@ -47,20 +49,22 @@ Docker Desktop and Docker Compose are not required. LiveKit Server runs directly
 | Dart `http` | `1.6.0` |
 | permission_handler | `12.0.3` |
 | python-dotenv | `1.2.2` |
+| Minimum Dart SDK | `3.8.0` |
 
 ## Prerequisites
 
 - Windows laptop
 - Administrator PowerShell for the first setup
 - Python 3.12
-- Flutter stable with Android toolchain
+- Flutter stable with Dart 3.8 or newer
+- Android toolchain
 - Physical Android phone with USB debugging
-- Laptop and phone on the same Wi-Fi for the first test
+- Laptop and phone on the same Wi-Fi
 - Headphones for echo-free audio verification
 
-## 1. One-time setup
+## 1. Setup
 
-Open **PowerShell as Administrator**:
+Open PowerShell as Administrator:
 
 ```powershell
 git checkout development
@@ -69,100 +73,101 @@ cd spikes\phase1_livekit
 powershell -ExecutionPolicy Bypass -File .\setup_phase1.ps1
 ```
 
-This command:
+The setup prefers an active physical Wi-Fi adapter, then Ethernet. VPN and virtual adapters are not preferred. Check the selected interface printed by the script.
 
-1. Downloads and checksum-verifies native LiveKit Server.
-2. Detects the laptop LAN IPv4 address.
-3. Creates the ignored `.env` file.
-4. Adds local Windows Firewall rules.
-5. Creates both Python virtual environments.
-6. Installs pinned Python dependencies.
-7. Generates the Flutter Android wrapper.
+To force the correct laptop IPv4 address:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\setup_phase1.ps1 -LanIp 192.168.1.20
+```
+
+Setup performs these operations:
+
+1. Downloads and checksum-verifies LiveKit Server 1.13.1.
+2. Creates or refreshes the ignored `.env` file.
+3. Adds local Windows Firewall rules.
+4. Creates both Python virtual environments.
+5. Installs pinned Python dependencies.
+6. Generates or refreshes the Flutter Android wrapper.
+7. Applies required Android permissions and local cleartext settings.
 8. Installs Flutter dependencies.
 
-Review `.env` after setup. The LAN IP must match the active Wi-Fi IPv4 shown by `ipconfig`.
-
-## 2. Validate before device testing
+## 2. Validate
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\validate.ps1
 ```
 
-This checks Python syntax, native LiveKit installation, required environment values, Flutter dependency resolution, Flutter analysis and Flutter tests.
+Validation checks:
 
-## 3. Start Phase 1 services
+- Project PowerShell syntax
+- Python 3.12 source syntax
+- Pinned Python SDK imports and versions
+- Native LiveKit installation
+- `.env` IP and URL consistency
+- Environment-derived LiveKit credential synchronization
+- Android permissions and cleartext setting
+- Dart SDK constraint
+- `flutter pub get`
+- `flutter analyze`
+- `flutter test`
 
-Start LiveKit, token service and Python participant:
+## 3. Start services and app
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\start_phase1.ps1
-```
-
-With the Android phone connected, start all services and open a Flutter run terminal:
+Connect the physical Android phone, then run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\start_phase1.ps1 -RunFlutter
 ```
 
-Generated service logs are stored in:
+This starts:
 
-```text
-.runtime/
-```
+- Native LiveKit Server
+- Development token service
+- Python test participant
+- Flutter run terminal
+
+Every start clears previous service logs. Runtime logs and the generated LiveKit config are stored under ignored `.runtime/`.
 
 ## 4. Test on the phone
 
-In the Flutter app:
-
 1. Tap **Join Phase 1 Room**.
 2. Allow microphone and camera.
-3. Confirm the Python animated video appears.
+3. Confirm the animated Python video appears.
 4. Confirm the periodic test tone is audible.
 5. Speak and confirm Python receives microphone frames.
 6. Test mute and unmute.
 7. Test camera off and on.
 8. Test front and back camera switching.
 9. Test speaker and earpiece routing.
-10. Turn Wi-Fi off for 10 seconds and verify reconnect.
-11. Send the app to background and return.
-12. Leave the room and verify clean cleanup.
+10. Test a wired or Bluetooth headset when available.
+11. Turn Wi-Fi off for 10 seconds and verify reconnect.
+12. Send the app to background and return.
+13. Leave and verify clean cleanup.
 
 Raw microphone audio is not stored by the Python participant.
 
-## 5. Check automatic evidence
-
-After joining from the physical phone:
+## 5. Check current-run evidence
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\check_phase1.ps1
 ```
 
-The checker reports:
+The checker verifies localhost and LAN ports, token health and real credential generation, process identity, generated media publication, Flutter participant connection and received microphone frames.
 
-- Native LiveKit installation
-- Python environments
-- Flutter Android generation
-- LiveKit and token-service ports
-- Token-service health
-- Required processes
-- Generated audio publication
-- Generated video publication
-- Physical Flutter participant connection
-- Incoming phone microphone frames
+The checker cannot prove that the client was a physical phone or that video/audio was visibly/audibly correct. Those checks remain manual.
 
-Visual remote-video rendering, audible test tone, control behavior, reconnect and clean leave still require manual confirmation.
+## 6. Stop
 
-## 6. Stop everything
-
-Stop Flutter with `Ctrl+C`, then run:
+Close the Flutter run terminal with `Ctrl+C`, then run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\stop_phase1.ps1
 ```
 
-The stop script only terminates Phase 1 processes recorded by the startup script and the native LiveKit executable from this project.
+The stop script verifies process identity before terminating recorded Phase 1 processes.
 
-## Phase 1 exit gate
+## Exit gate
 
 Phase 1 passes only when all are true:
 
@@ -172,8 +177,9 @@ Phase 1 passes only when all are true:
 - Python publishes generated audio and video.
 - Flutter renders remote video and plays remote audio.
 - Mute, camera controls and camera switch work.
-- Reconnect works under temporary network loss.
+- Audio routes are tested.
+- Reconnect works after temporary network loss.
 - Foreground/background behavior is documented.
-- No permanent ghost participant or process remains.
+- No ghost participant or process remains.
 
-Record evidence in `GO_NO_GO_REPORT.md`. Until those checks are complete, the status remains **implementation complete, verification pending**.
+Record evidence in `GO_NO_GO_REPORT.md`. Until then the status remains **implementation complete, physical verification pending**.
