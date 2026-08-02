@@ -65,7 +65,7 @@ function Stop-RecordedProcesses {
 
     try {
         $records = Get-Content $processFile -Raw | ConvertFrom-Json
-        foreach ($record in $records) {
+        foreach ($record in @($records)) {
             $process = Get-Process -Id $record.pid -ErrorAction SilentlyContinue
             if ($process) {
                 Stop-Process -Id $record.pid -Force -ErrorAction SilentlyContinue
@@ -95,39 +95,46 @@ $processRecords = @()
 
 try {
     Write-Host 'Starting native LiveKit Server...' -ForegroundColor Cyan
-    $livekitProcess = Start-Process \
-        -FilePath $livekitExecutable \
-        -ArgumentList @('--config', $livekitConfig, '--node-ip', $env:LIVEKIT_NODE_IP) \
-        -WorkingDirectory $root \
-        -RedirectStandardOutput (Join-Path $runtimeDirectory 'livekit.out.log') \
-        -RedirectStandardError (Join-Path $runtimeDirectory 'livekit.err.log') \
-        -PassThru
+    $livekitStart = @{
+        FilePath               = $livekitExecutable
+        ArgumentList           = @('--config', $livekitConfig, '--node-ip', $env:LIVEKIT_NODE_IP)
+        WorkingDirectory       = $root
+        RedirectStandardOutput = (Join-Path $runtimeDirectory 'livekit.out.log')
+        RedirectStandardError  = (Join-Path $runtimeDirectory 'livekit.err.log')
+        PassThru               = $true
+    }
+    $livekitProcess = Start-Process @livekitStart
     $processRecords += [pscustomobject]@{ name = 'livekit'; pid = $livekitProcess.Id }
     Wait-TcpPort -HostName '127.0.0.1' -Port 7880
 
     Write-Host 'Starting development token service...' -ForegroundColor Cyan
-    $tokenProcess = Start-Process \
-        -FilePath $tokenPython \
-        -ArgumentList @((Join-Path $root 'token_service\server.py')) \
-        -WorkingDirectory $root \
-        -RedirectStandardOutput (Join-Path $runtimeDirectory 'token-service.out.log') \
-        -RedirectStandardError (Join-Path $runtimeDirectory 'token-service.err.log') \
-        -PassThru
+    $tokenStart = @{
+        FilePath               = $tokenPython
+        ArgumentList           = @((Join-Path $root 'token_service\server.py'))
+        WorkingDirectory       = $root
+        RedirectStandardOutput = (Join-Path $runtimeDirectory 'token-service.out.log')
+        RedirectStandardError  = (Join-Path $runtimeDirectory 'token-service.err.log')
+        PassThru               = $true
+    }
+    $tokenProcess = Start-Process @tokenStart
     $processRecords += [pscustomobject]@{ name = 'token-service'; pid = $tokenProcess.Id }
     Wait-TcpPort -HostName '127.0.0.1' -Port 8090
+
     $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8090/health' -TimeoutSec 5
     if ($health.status -ne 'ok') {
         throw 'Token service health check did not return status=ok.'
     }
 
     Write-Host 'Starting Python test participant...' -ForegroundColor Cyan
-    $participantProcess = Start-Process \
-        -FilePath $participantPython \
-        -ArgumentList @((Join-Path $root 'python_participant\participant.py')) \
-        -WorkingDirectory $root \
-        -RedirectStandardOutput (Join-Path $runtimeDirectory 'python-participant.out.log') \
-        -RedirectStandardError (Join-Path $runtimeDirectory 'python-participant.err.log') \
-        -PassThru
+    $participantStart = @{
+        FilePath               = $participantPython
+        ArgumentList           = @((Join-Path $root 'python_participant\participant.py'))
+        WorkingDirectory       = $root
+        RedirectStandardOutput = (Join-Path $runtimeDirectory 'python-participant.out.log')
+        RedirectStandardError  = (Join-Path $runtimeDirectory 'python-participant.err.log')
+        PassThru               = $true
+    }
+    $participantProcess = Start-Process @participantStart
     $processRecords += [pscustomobject]@{ name = 'python-participant'; pid = $participantProcess.Id }
 
     $processRecords | ConvertTo-Json | Set-Content -Path $processFile -Encoding UTF8
@@ -156,7 +163,9 @@ try {
         Write-Host 'powershell -ExecutionPolicy Bypass -File .\start_phase1.ps1 -RunFlutter'
     }
 } catch {
-    $processRecords | ConvertTo-Json | Set-Content -Path $processFile -Encoding UTF8
+    if ($processRecords.Count -gt 0) {
+        $processRecords | ConvertTo-Json | Set-Content -Path $processFile -Encoding UTF8
+    }
     & (Join-Path $root 'stop_phase1.ps1')
     throw
 }
