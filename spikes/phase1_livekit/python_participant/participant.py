@@ -8,13 +8,16 @@ import os
 import signal
 from array import array
 from datetime import timedelta
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 from livekit import api, rtc
 
-load_dotenv()
+PHASE_ROOT = Path(__file__).resolve().parents[1]
+ENV_PATH = PHASE_ROOT / ".env"
+load_dotenv(ENV_PATH)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -41,6 +44,9 @@ VIDEO_FPS = 10
 
 
 def require_environment() -> None:
+    if not ENV_PATH.is_file():
+        raise RuntimeError(f"Missing environment file: {ENV_PATH}")
+
     missing = [
         name
         for name, value in {
