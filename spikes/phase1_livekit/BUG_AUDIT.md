@@ -9,7 +9,7 @@
 - Static source audit pass 1: **COMPLETE**
 - Static source audit pass 2: **COMPLETE**
 - Identified source/configuration defects: **FIXED**
-- Total fixed defects: **32**
+- Total fixed defects: **40**
 - Physical Android runtime verification: **PENDING**
 - Final Phase 1 GO decision: **PENDING**
 
@@ -51,6 +51,14 @@ A source fix is not runtime proof. `validate.ps1` must pass on the Windows lapto
 | P1-BUG-030 | High | Obsolete static YAML retained hardcoded development credentials and could be used accidentally. | Removed the static YAML; only ignored runtime config is used. |
 | P1-BUG-031 | Critical | Generated runtime YAML contains the API secret but `.runtime/` was not ignored by Git. | Added `.runtime/` to `.gitignore`; generated Android wrapper is also ignored. |
 | P1-BUG-032 | High | Validation did not prove pinned Python SDK imports or LiveKit/token credential synchronization. | Added venv SDK/version checks and generated-config secret consistency validation. |
+| P1-BUG-033 | High | Flutter accepted credential responses with a non-WebSocket URL or a different room/identity. | Validate `ws/wss` and bind returned credentials to the original request. |
+| P1-BUG-034 | Medium | HTTP client connection failures were not converted into a readable token-service error. | Added `ClientException` handling and test coverage. |
+| P1-BUG-035 | High | Python participant accepted invalid or empty room, identity and LiveKit URL values. | Added fail-fast environment and identity validation. |
+| P1-BUG-036 | Medium | Token service called `shutdown()` from its own server thread after `serve_forever()` unwound. | Removed unnecessary same-thread shutdown to avoid a potential deadlock. |
+| P1-BUG-037 | High | Python services depended on the caller's current working directory to discover `.env`. | Both services now load `.env` from the Phase 1 root resolved from `__file__`. |
+| P1-BUG-038 | High | Existing firewall rules with correct names but wrong ports or disabled state were accepted. | Administrator setup recreates exact enabled inbound TCP/UDP rules; validation checks them. |
+| P1-BUG-039 | Medium | LAN candidate ordering used an address property that did not reliably contain interface metric. | Metrics now come from `Get-NetIPInterface`. |
+| P1-BUG-040 | High | Camera switching relied on unsupported/internal `Hardware.selectedVideoInput` state. | Current device is read from `LocalVideoTrack.currentOptions.deviceId`; unsupported setter removed. |
 
 ## Automated coverage after both audits
 
@@ -58,13 +66,15 @@ A source fix is not runtime proof. `validate.ps1` must pass on the Windows lapto
 - Python 3.12 syntax checks
 - Pinned Python LiveKit package import/version checks
 - Native LiveKit executable/version check
-- Exact environment and URL consistency checks
+- Exact environment, URL and active local-IP checks
+- Exact Windows Firewall rule checks
 - Environment-derived LiveKit config generation and key/secret synchronization
 - Android permission and cleartext checks
 - Dart SDK constraint check
 - Flutter dependency resolution, analysis and tests
-- Credential model parsing and incomplete-response rejection
-- JSON and non-JSON token-service errors
+- Credential model URL validation and incomplete-response rejection
+- Requested room/identity response binding
+- JSON, non-JSON and client token-service errors
 - Invalid token-service URL handling
 - Localhost and LAN service checks
 - Runtime token-generation smoke check
